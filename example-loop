@@ -1,0 +1,10 @@
+filename='samples1.txt'
+exec 4<$filename
+echo start
+while read -u4 p ; do
+(trimmomatic, all step here but modify)
+
+picard MarkDuplicates I=$p.ngm.sorted.bam O=$p,sorted.dp.bam METRICS_FILES....
+
+
+#can add in to delete the unneeded files - can delete all .bam files except the bqst bam files 
