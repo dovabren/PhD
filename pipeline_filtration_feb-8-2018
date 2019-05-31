@@ -1,0 +1,68 @@
+#locate file with all data
+
+java -jar /data4/Trimmomatic-0.36/trimmomatic-0.36.jar PE -threads 36 -phred33 HI.2178.008.Index_13.Q11D1_R1.fastq  HI.2178.008.Index_13.Q11D1_R2.fastq  Q11D1_paired_R1.fastq.gz  Q11D1_unpaired_R1 .fastq.gz  Q11D1_paired_R2.fastq.gz  Q11D1_unpaired_R2.fastq.gz ILLUMINACLIP :/usr/local/scripts/ADAPTER.fa:2:30:10 LEADING:20 TRAILING:20 SLIDINGWINDOW:20:25 MINLEN:35
+
+#find where the reference genome is located (which server)
+locate am45new 
+
+fastqc –t 36 *paired*
+
+ngm -r /data2/Training_set/am45new.fasta -p -1 Q11D1_paired_R1.fastq -2 Q11D1_paired_R2.fastq -t 36  -b --rg-id Q11D1 --rg-sm Q11D1 --rg-lb PE --rg-pl Illumina -o Q11D1_ngm_aligned.bam
+
+Samtools sort Q11D1_ngm_aligned.bam -o Q11D1_ngm_aligned_sorted_1.bam 
+
+Samtools index Q11D1_ngm_aligned_sorted_1.bam
+
+java -jar /usr/local/src/picard-tools-2.1.0/picard.jar MarkDuplicates I=Q11D1_ngm_aligned_sorted.bam O=Q11D1_marked_duplicates.bam M=Q11D1_marked_dup_metrics.txt VALIDATION_STRINGENCY=SILENT MAX_FILE_HANDLES_FOR_READ_ENDS_MAP=1000
+
+samtools index Q11D1_marked_duplicates.bam
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T BaseRecalibrator -nct 36 -R /data2/Training_set/am45new.fasta -I Q11D1_marked_duplicates.bam --knownSites /data2/Training_set/INDEL_TRAINING.vcf --knownSites /data2/Training_set/SNP_TRAINING.vcf -o Q11D1.recall.table
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T PrintReads -R /data2/Training_set/am45new.fasta -nct 36 -I Q11D1_marked_duplicates.bam -BQSR Q11D1.recall.table -o Q11D1_BQSR.bam
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T HaplotypeCaller -R /data2/Training_set/am45new.fasta -I Q11D1_BQSR.bam --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 -o Q11D1_raw_variants.vcf
+
+#the GVCF command is going to insert the reference genome where ever there is missing data or information 
+#make this GVCF then merge the GVCF and make just a VCF that will be fed into filtration 
+#old haplotype caller 
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T HaplotypeCaller -R /data2/Training_set/am45new.fasta -I $sid"_BQSR.bam" --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 -o $sid"_raw_variants.g.vcf"
+
+#new- for each drone
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T HaplotypeCaller -nct 40 -R /data2/Training_set/am45new.fasta -I Q11D1_BQSR.bam --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 --emitRefConfidence GVCF -ploidy 1 -o Q11D1_raw_variants.g.vcf
+
+#new- queen
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T HaplotypeCaller -nct 40 -R /data2/Training_set/am45new.fasta -I Q11_BQSR.bam --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 --emitRefConfidence GVCF -ploidy 2 -o Q11_raw_variants.g.vcf
+#run the command above on all the drones BQSR bams to produce their gvcf files, then you have to merge the gvcf files using this command
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T HaplotypeCaller -R /data2/Training_set/am45new.fasta --variant Q11D1_raw_variants.g.vcf --variant Q11D2_raw_variants.g.vcf --variant Q11D3_raw_variants.g.vcf --variant Q11D4_raw_variants.g.vcf --variant Q11D5_raw_variants.g.vcf -o drones_1to5.g.vcf 
+
+
+#katie's haplotype caller
+#use 1 for haploid, 2 for diploid
+gatk  -T HaplotypeCaller -nct 20 -R reference.fa -I File.Bam -emitRefConfidence GVCF -variant_index_type LINEAR -variant_index_parameter 128000 -ploidy 2 -o OutFile.snps.indels.g.vcf 
+
+#not sure when to use this
+gatk -T CombineGVCFs -R reference.fa --variant --variant --variant ... -o cohort.g.vcf
+
+
+#the join genotype is going to combine many GVCFs together when working with many (100+) drones 
+at this point will need to filter based on chromosome (ASK HOW TO SPLIT THIS UP) bc it will otherwise take too long so split to 1000 reads at a time 
+
+#this is only going to call alternate alleles - if there is no data present it might think this is a mistake 
+
+#can tell it that it is haploid or diploid with the -ploidy 2 or 1 commans -->this step is instead of using the heterozygous SNP filter 
+
+#convert g.vcf into vcf
+
+#from katie, run in parallel windows
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T GenotypeGVCFs -R /data2/Training_set/am45new.fasta -V sample1.g.vcf -V sample2.g.vcf -V sample3.g.vcf ...ect -o output.final.vcf
+
+#run one at a time 
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T GenotypeGVCFs -R /data2/Training_set/am45new.fasta -V Q11D1_raw_variants.g.vcf -o Q11D1_raw_variants_final.vcf
+
+
+#merge
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T GenotypeGVCFs -R /data2/Training_set/am45new.fasta --variant Q11D1_raw_variants.g.vcf --variant Q11D2_raw_variants.g.vcf --variant Q11D4_raw_variants.g.vcf --variant Q11D5_raw_variants.g.vcf -o drones_1to5.g.vcf
+
+ 
