@@ -1,0 +1,173 @@
+---
+title: "Downstream_filtration"
+output:
+  html_document: default
+  pdf_document: default
+---
+#prep to Remove SNPs lying within 5bp of an indel 
+unzip each vcf file 
+unzip the merged file
+
+```{bash}
+#double check that these are the only files to unzip
+ls *raw_variants.vcf.gz 
+#loop:
+for vcf in *raw_variants.vcf.gz; do gunzip $vcf; done
+
+gunzip all_Q11D1_5_merge.vcf.gz
+```
+
+keep only indels- this will be used as a reference for later with GATK
+**DONT do this for queen- use the drone INDEL file and ask Tanushree when she gets back** 
+```{bash}
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T SelectVariants -R /data2/Training_set/am45new.fasta -V Q11D1_raw_variants.vcf -selectType INDEL -o Q11D1_indels.vcf
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T SelectVariants -R /data2/Training_set/am45new.fasta -V Q11D2_raw_variants.vcf -selectType INDEL -o Q11D2_indels.vcf
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T SelectVariants -R /data2/Training_set/am45new.fasta -V Q11D4_raw_variants.vcf -selectType INDEL -o Q11D4_indels.vcf
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T SelectVariants -R /data2/Training_set/am45new.fasta -V Q11D5_raw_variants.vcf -selectType INDEL -o Q11D5_indels.vcf
+```
+
+zip all files again
+tabix all again
+```{bash}
+ls *_indels.vcf
+for vcf in *_indels.vcf; do bgzip $vcf; done
+
+ls *_indels.vcf.gz
+for vcf in *_indels.vcf.gz; do tabix -p vcf $vcf; done
+```
+
+merge all these indel files together 
+
+```{bash}
+vcf-merge *_indels.vcf.gz | bgzip -c > drones_1to5_indels.vcf.gz
+```
+
+keep only SNPs
+**still do this for queen**
+```{bash}
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T SelectVariants -R /data2/Training_set/am45new.fasta -V Q11D1_raw_variants.vcf -selectType SNP -o Q11D1_snp.vcf
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T SelectVariants -R /data2/Training_set/am45new.fasta -V Q11D2_raw_variants.vcf -selectType SNP -o Q11D2_snp.vcf
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T SelectVariants -R /data2/Training_set/am45new.fasta -V Q11D4_raw_variants.vcf -selectType SNP -o Q11D4_snp.vcf
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T SelectVariants -R /data2/Training_set/am45new.fasta -V Q11D5_raw_variants.vcf -selectType SNP -o Q11D5_snp.vcf
+
+ls *_snp.vcf
+for vcf in *_snp.vcf; do bgzip $vcf; done
+
+ls *_snp.vcf.gz
+for vcf in *_snp.vcf.gz; do tabix -p vcf $vcf; done
+
+vcf-merge *_snp.vcf.gz | bgzip -c > drones_1to5_snp.vcf.gz
+```
+
+unzip
+
+```{bash}
+gunzip drones_1to5_indels.vcf.gz
+gunzip drones_1to5_snp.vcf.gz
+gunzip all_Q11D1_5_merge.vcf.gz #if not zipped
+```
+
+**first time ran the java GATK -variant filtration got an error, bc of incompatible contigs**
+fixed by: 
+re-sorting the indel, snp, and merged files (get code from harshil--> used python)
+doing the scaffold step first bc chromosome 17 was missing some information --> command moved to after GATK
+sorting of the SNP and INDEL file (get from Harshil)
+```{python}
+python3 dova-pipeline-tools.py sort_vcf  <input.vcf> <output.vcf>
+```
+
+now we compare the merged SNP file with all the bad indels we have 
+#remove SNPs within 5bp of indels
+java -jar <gatk_path> -T VariantFiltration -R <reference_path> -V <merged_snp_file> 
+--mask <merged_indel_file> --maskExtension 5 --maskName "bad_snp" -o <output_filename.vcf> 
+
+replace <gatk_path> with the path to gatk (don't include the '< and >' symbols.
+
+the maskExtension 5 says how far away from an indel to check for snps to mask, and maskName you can name it whatever you want i stuck with bad_snp because you liked that
+
+and -o output_filename.vcf name it something informative, like ericas_drones_1_to_5_snps_filter1.vcf or something but its up to you!
+
+**still do this for queen**
+```{bash}
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/am45new.fasta -V drones_1to5_snp_v1.vcf -mask drones_1to5_indels_v1.vcf --maskExtension 5 --maskName "bad_snp" -o drones_1to5_snps_filter1.vcf
+```
+
+After the filter step above with gatk variant filtration 
+you need to change the version of the vcf with:
+*still do this for queen*
+```{bash}
+cat drones_1to5_snps_filter1.vcf | vcf-convert -v 4.1 > drones_1to5_snps_filter2.vcf 
+```
+
+so the filter only labels bad snps it doesnt remove them so you have to run this line to remove them out
+*still do this for queen*
+```{bash}
+vcftools --vcf drones_1to5_snps_filter2.vcf --remove-filtered-all --recode --recode-INFO-all --out drones_1to5_snps_filter3.vcf 
+```
+
+output here is: drones_1to5_snps_filter3.vcf.log  drones_1to5_snps_filter3.vcf.recode.vcf
+
+#Remove SNPs from unplaced scaffolds
+this is chromosome 17 and 18
+```{bash}
+grep -v '^17\.' drones_1to5_snps_filter3.vcf > drones_1to5_snp_filter4.vcf 
+
+#ask if should remove 18 bc its mitochondrial 
+grep -v '^18\.' drones_1to5_snp_filter4.vcf > drones_1to5_snp_filter5.vcf 
+```
+
+#Remove SNPs with lowest 10% quality score - find minimum phred quality score (hers was 140)
+awk {'print $6'} 
+--> within curly brackets, tell it which column
+if only printing the quality score then pipe it to |less --chop-long-lines because it will print all the quality scores and keep printing 
+need to also get rid of headers before sorting
+sort: find 6th column then stop at 6th (thats the comma)
+```{bash}
+#find quality
+grep -v '#' drones_1to5_snp_filter5.vcf | less --chop-long-lines 
+
+#make list of headers and make file that is header-less and pipe it to sort on the 6th column and show
+grep -v '#' drones_1to5_snp_filter5.vcf| sort -nk6,6 | less --chop-long-lines
+```
+
+can find percentile in python
+and graph it 
+```{python}
+np,percentile(dps, 10)
+#this is at the 10th percentile 
+graph.axvline(np,percentile(dps, 10), color='black')
+
+```
+
+
+Removal of heterozygous SNPs called in drones
+*ignore this now bc we did it before with the haplotype caller*
+
+#Filter of average depth (12 to 88 reads) 
+
+*Feb 8, 2018*
+#Hand filtering of SNPs 
+
+
+
+
+
+
+
+
+
+brocks data path on bombus
+
+/usr/local/scripts/TRAINING_SET/putativeCNV.bed
+
+
+
+
+
+

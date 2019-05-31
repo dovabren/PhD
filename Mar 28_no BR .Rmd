@@ -1,0 +1,163 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+March 28, 2018
+pipeline on Q11D1:
+```{bash}
+java -jar /data4/Trimmomatic-0.36/trimmomatic-0.36.jar PE -threads 36 -phred33 HI.2178.008.Index_13.Q11D1_R1.fastq  HI.2178.008.Index_13.Q11D1_R2.fastq Q11D1_paired_R1.fastq.gz Q11D1_unpaired_R1.fastq.gz Q11D1_paired_R2.fastq.gz Q11D1_unpaired_R2.fastq.gz ILLUMINACLIP :/usr/local/scripts/ADAPTER.fa:2:30:10 LEADING:20 TRAILING:20 SLIDINGWINDOW:20:25 MINLEN:35
+
+fastqc –t 36 *paired*
+
+ngm -r /data2/Training_set/am45new.fasta -p -1 Q11D1_paired_R1.fastq.gz -2 Q11D1_paired_R2.fastq.gz -t 36 -b --rg-id Q11D1 --rg-sm Q11D1 --rg-lb PE --rg-pl Illumina -o Q11D1_ngm_aligned.bam
+
+samtools sort Q11D1_ngm_aligned.bam -o Q11D1_ngm_aligned_sorted.bam 
+
+samtools index Q11D1_ngm_aligned_sorted.bam
+
+java -jar /usr/local/src/picard-tools-2.1.0/picard.jar MarkDuplicates I=Q11D1_ngm_aligned_sorted.bam O=Q11D1_marked_duplicates.bam M=Q11D1_marked_dup_metrics.txt VALIDATION_STRINGENCY=SILENT MAX_FILE_HANDLES_FOR_READ_ENDS_MAP=1000
+
+samtools index Q11D1_marked_duplicates.bam
+
+#recommended to remove this step
+#java -jar /usr/local/src/GenomeAnalysisTK.jar -T BaseRecalibrator -nct 36 -R /data2/Training_set/am45new.fasta -I Q11D1_marked_duplicates.bam --knownSites /data2/Training_set/INDEL_TRAINING.vcf --knownSites /data2/Training_set/SNP_TRAINING.vcf -o Q11D1.recal.table
+
+#java -jar /usr/local/src/GenomeAnalysisTK.jar -T PrintReads -R /data2/Training_set/am45new.fasta -nct 36 -I Q11D1_marked_duplicates.bam -BQSR Q11D1.recal.table -o Q11D1_BQSR.bam
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T PrintReads -R /data2/Training_set/am45new.fasta -nct 36 -I Q11D1_marked_duplicates.bam -o Q11D1_BQSR_noBR.bam
+```
+
+callable loci
+java -jar GenomeAnalysisTK.jar \
+     -T CallableLoci \
+     -R reference.fasta \
+     -I myreads.bam \
+     -summary table.txt \
+     -o callable_status.bed
+ 
+```{bash}
+#queen callable
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T CallableLoci -R /data2/Training_set/am45new.fasta -I Q11_BQSR_noBR.bam -summary queen_sum_noBR.txt -o queen_callable_noBR.bed
+
+#drone 1
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T CallableLoci -R /data2/Training_set/am45new.fasta -I Q11D1_BQSR_noBR.bam -summary Q11D1_sum_noBR.txt -o Q11D1_callable_noBR.bed
+#drone 2
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T CallableLoci -R /data2/Training_set/am45new.fasta -I Q11D2_BQSR_noBR.bam -summary Q11D2_sum_noBR.txt -o Q11D2_callable_noBR.bed
+#drone 4
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T CallableLoci -R /data2/Training_set/am45new.fasta -I Q11D4_BQSR_noBR.bam -summary Q11D4_sum_noBR.txt -o Q11D4_callable_noBR.bed
+#drone 5
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T CallableLoci -R /data2/Training_set/am45new.fasta -I Q11D5_BQSR_noBR.bam -summary Q11D5_sum_noBR.txt -o Q11D5_callable_noBR.bed
+```
+
+
+```{bash}
+samtools index Q11_BQSR_noBR.bam
+
+#Queen
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T HaplotypeCaller -nct 40 -R /data2/Training_set/am45new.fasta -I Q11_BQSR_noBR.bam --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 -ploidy 2 -o Q11_raw_variants_noBR.g.vcf.gz -ERC GVCF
+
+
+#Drones - for each drone 
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T HaplotypeCaller -nct 24 -R /data2/Training_set/am45new.fasta -I Q11D1_BQSR_noBR.bam --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 -ploidy 1 -o Q11D1_raw_variants_noBR.g.vcf.gz -ERC GVCF
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T HaplotypeCaller -nct 24 -R /data2/Training_set/am45new.fasta -I Q11D2_BQSR_noBR.bam --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 -ploidy 1 -o Q11D2_raw_variants_noBR.g.vcf.gz -ERC GVCF
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T HaplotypeCaller -nct 24 -R /data2/Training_set/am45new.fasta -I Q11D4_BQSR_noBR.bam --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 -ploidy 1 -o Q11D4_raw_variants_noBR.g.vcf.gz -ERC GVCF
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T HaplotypeCaller -nct 24 -R /data2/Training_set/am45new.fasta -I Q11D5_BQSR_noBR.bam --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 -ploidy 1 -o Q11D5_raw_variants_noBR.g.vcf.gz -ERC GVCF
+
+#from here after loop - mar 28
+#merge drones and queen (with genotype GVCF)
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T GenotypeGVCFs -R /data2/Training_set/am45new.fasta --variant Q11D1_raw_variants_noBR.g.vcf.gz --variant Q11D2_raw_variants_noBR.g.vcf.gz --variant Q11D4_raw_variants_noBR.g.vcf.gz --variant Q11D5_raw_variants_noBR.g.vcf.gz --variant Q11_raw_variants_noBR.g.vcf.gz -o drones_queen_noBR.g.vcf
+
+#select variants SNP
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T SelectVariants -R /data2/Training_set/am45new.fasta -V drones_queen_noBR.g.vcf -selectType SNP -o drones_queen_snp_noBR.vcf
+
+# keep getting error with INDEL so tried using grep to make the INDEL file and then added headers-- then run select variants 
+grep -v INDEL drones_queen_noBR.g.vcf > drones_queen_indels1_noBR.vcf
+
+grep -v ‘#’ drones_queen_indels1_noBR.vcf | sort | less --chop-long-lines
+
+#select variants INDEL
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T SelectVariants -R /data2/Training_set/am45new.fasta -V drones_queen_indels1_noBR.vcf -selectType INDEL -o drones_queen_indels2_noBR.vcf
+
+#VariantRecalibration SNP
+java -Xmx4g -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantRecalibrator -R /data2/Training_set/am45new.fasta -input drones_queen_snp_noBR.vcf -recalFile drones_queen_noBR.recal -tranchesFile drones_queen_noBR.tranches -resource:hapmap,known=false,training=true,truth=true,prior=15.0 /data2/Training_set/SNP_TRAINING.vcf -an QD -an MQ -an MQRankSum -an ReadPosRankSum -an FS -an SOR -an DP -mode SNP -nt 4
+
+#ApplyRecalibration SNP -done mar 9 *this is the VQSR step
+java -Xmx3g -jar /usr/local/src/GenomeAnalysisTK.jar -T ApplyRecalibration -R /data2/Training_set/am45new.fasta -input drones_queen_snp_noBR.vcf -tranchesFile drones_queen_noBR.tranches -recalFile drones_queen_noBR.recal -o drones_queen_recalibrated_snp_noBR.vcf --ts_filter_level 99.5 -mode SNP
+
+#java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/am45new.fasta -V drones_queen_recalibrated_snp_noBR.vcf --filterExpression "MQ < 50.0" --filterName "LowMQ50" --filterExpression "QD < 5.0" --filterName "LowQD5" --filterExpression "FS > 60.0" --filterName "FS60" --filterExpression "SOR > 3" --filterName "SOR" -o drones_queen_filtered_hard_noBR.vcf
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/am45new.fasta -V drones_queen_recalibrated_snp_noBR.vcf --filterExpression "MQ < 50.0" --filterName "LowMQ50" -o drones_queen_filtered_hard_1_noBR.vcf
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/am45new.fasta -V drones_queen_filtered_hard_1_noBR.vcf --filterExpression "QD < 2.0" --filterName "LowQD2" -o drones_queen_filtered_hard_2_noBR.vcf
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/am45new.fasta -V drones_queen_filtered_hard_2_noBR.vcf --filterExpression "FS > 60.0" --filterName "FS60" -o drones_queen_filtered_hard_3_noBR.vcf
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/am45new.fasta -V drones_queen_filtered_hard_3_noBR.vcf  --filterExpression "SOR > 3" --filterName "SOR"  -o drones_queen_filtered_hard_4_noBR.vcf
+
+#MQranksum not defined
+#java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/am45new.fasta -V drones_queen_filtered_hard_4_noBR.vcf --filterExpression "MQRankSum < -5" --filterName "MQRSlow" --filterExpression "MQRankSum > 5" --filterName "MQRShigh" -o drones_queen_filtered_hard_5_noBR.vcf
+
+#RPRS not defined 
+#java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/am45new.fasta -V drones_queen_filtered_hard_4_noBR.vcf --filterExpression "ReadPosRankSum < -8.0" --filterName "RPRS" -o drones_queen_filtered_hard_6_noBR.vcf
+
+
+#VariantFiltration - done mar 10
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/am45new.fasta -V drones_queen_filtered_hard_4_noBR.vcf -mask drones_queen_indels2_noBR.vcf --maskExtension 5 --maskName "bad_snp" -o drones_queen_filter1_noINDEL_noBR.vcf
+
+
+cat drones_queen_filter1_noINDEL_noBR.vcf | vcf-convert -v 4.1 > drones_queen_filter2_noBR.vcf 
+
+#--remove-filtered-all will remove anything with a filter flag and not PASS 
+vcftools --vcf drones_queen_filter2_noBR.vcf --remove-filtered-all --recode --recode-INFO-all --out drones_queen_filter3_noBR.vcf
+
+grep -v '^17\.' drones_queen_filter3_noBR.vcf.recode.vcf > drones_queen_filter4_noBR.vcf
+
+grep -v '^18\.' drones_queen_filter4_noBR.vcf > drones_queen_filter5_noBR.vcf 
+```
+
+April 11
+INFO  16:27:02,665 VariantDataManager - QD:      mean = 27.63    standard deviation = 4.67 
+INFO  16:27:02,823 VariantDataManager - MQ:      mean = 59.43    standard deviation = 3.41 
+INFO  16:27:02,969 VariantDataManager - MQRankSum:       mean = 0.04     standard deviation = 0.97 
+INFO  16:27:03,130 VariantDataManager - ReadPosRankSum:          mean = 0.18     standard deviation = 1.29 
+INFO  16:27:03,291 VariantDataManager - FS:      mean = 2.46     standard deviation = 4.90 
+INFO  16:27:03,411 VariantDataManager - SOR:     mean = 0.85     standard deviation = 0.37 
+INFO  16:27:03,532 VariantDataManager - DP:      mean = 262.13   standard deviation = 274.84 
+
+
+loop march 28 (in text edit)
+```{r}
+filename='Files_loop_projectX.txt'
+cat $filename | while read -r file
+do
+sid="$(cut -d'.' -f5 <<<$file)"
+
+java -jar /data4/Trimmomatic-0.36/trimmomatic-0.36.jar PE -threads 36 -phred33 $file"_R1.fastq" $file"_R2.fastq" $sid"_paired_R1.fastq" $sid"_unpaired_R1.fastq" $sid"_paired_R2.fastq" $sid"_unpaired_R2.fastq" ILLUMINACLIP:/usr/local/scripts/ADAPTER.fa:2:30:10 LEADING:20 TRAILING:20 SLIDINGWINDOW:20:25 MINLEN:35
+
+fastqc -t 36 $sid*paired*
+
+ngm -r /data2/Training_set/am45new.fasta -p -1 $sid"_paired_R1.fastq" -2 $sid"_paired_R2.fastq" -t 36 -b --rg-id $sid --rg-sm $sid --rg-lb PE --rg-pl Illumina -o $sid"_ngm_aligned.bam"
+
+samtools sort $sid"_ngm_aligned.bam" -o $sid"_ngm_aligned_sorted.bam" 
+
+samtools index $sid"_ngm_aligned_sorted.bam"
+
+java -jar /usr/local/src/picard-tools-2.1.0/picard.jar MarkDuplicates I=$sid"_ngm_aligned_sorted.bam" O=$sid"_marked_duplicates.bam" M=$sid"_marked_dup_metrics.txt" VALIDATION_STRINGENCY=SILENT MAX_FILE_HANDLES_FOR_READ_ENDS_MAP=1000
+
+samtools index $sid"_marked_duplicates.bam"
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T PrintReads -R /data2/Training_set/am45new.fasta -nct 36 -I $sid"_marked_duplicates.bam" -o $sid"_BQSR_noBR.bam"
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T CallableLoci -R /data2/Training_set/am45new.fasta -I $sid"_BQSR_noBR.bam" -summary $sid"_sum_noBR.txt" -o $sid"_callable_noBR.bed"
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T HaplotypeCaller -nct 24 -R /data2/Training_set/am45new.fasta -I $sid"_BQSR_noBR.bam" --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 -ploidy 1 -o $sid"_raw_variants_noBR.g.vcf.gz" -ERC GVCF
+
+done
+
+
+```
+
+

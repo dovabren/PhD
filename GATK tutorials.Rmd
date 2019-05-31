@@ -1,0 +1,51 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+GATK tutorial 
+
+*2.1 Run CombineVariants*
+To find out which set each variant belongs to, we can use CombineVariants. CombineVariants has a way to annotate each site with which set the site belongs to. For example, if a site is in GIAB and failed hard filtering but passed VQSR, CombineVariants will annotate the site with s et=G‐filterInH‐V.T he “filterIn” flag before the filtering method tells us the site failed the filtering method, hence it was “filtered” in the set.
+
+java‐jarGenomeAnalysisTK.jar\ 
+‐T CombineVariants\
+‐R ref/human_g1k_b37_20.fasta\ 
+‐V:G truth_dataset/NA12878.GIAB.vcf\ 
+‐V:H vcfs/NA12878.hard.filtered.vcf\ 
+‐V:V vcfs/NA12878.VQSR.filtered.vcf\ 
+‐o sandbox/NA12878.Combined.vcf
+
+```{bash}
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T CombineVariants -R /data2/Training_set/am45new.fasta -V:G drones_queen_snp.vcf -V:H drones_queen_filtered_hard.vcf -V:V drones_queen_recalibrated_snp.vcf -o drones_queen__unfiltered_VQSR_hard.vcf --genotypemergeoption UNSORTED
+```
+
+
+To view the set annotated VCF, we can simply view the end of the VCF using the Linux command  tail   tailsandbox/NA12878.Combined.vcf
+
+*2.2 Use VariantsToTable to make R readable table of annotations*
+Thiscommandallowsustoextractthechromosome,position,set,QD value,andFSvaluetoatablethatR can read. --allowMissingData allows any sites where any of the requested annotations are not present to still be output. --showFiltered is necessary because by default VariantsToTable does not output sites that are filtered by both hard filtering and VQSR.
+
+
+java‐jarGenomeAnalysisTK.jar\ 
+‐T VariantsToTable\
+‐R ref/human_g1k_b37_20.fasta\ 
+‐V sandbox/NA12878.Combined.vcf\ 
+‐osandbox/NA12878.Combined.table\ 
+‐F CHROM\
+‐F POS\
+‐F set\
+‐F QD\
+‐F FS\ 
+-‐allowMissingData\ 
+‐‐showFiltered
+```{bash}
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantsToTable -R /data2/Training_set/am45new.fasta -V drones_queen__unfiltered_VQSR_hard.vcf -o drones_queen__unfiltered_VQSR_hard.table -F CHROM -F POS -F set -F QD -F FS --allowMissingData --showFiltered
+
+#add in other parameters later? 
+```
+
+
+
+*2.3 Plot QD and FS Using R*
+Open up RStudio and click on Import Dataset in the top right box. Choose NA12878.Combined.table and click Import.
+You will see NA12878.Combined.table in the top left.

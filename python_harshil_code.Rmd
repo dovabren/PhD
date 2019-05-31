@@ -1,0 +1,116 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+plotting quality 
+```{python}
+import pandas as pd
+import matplotlib.pyplot as graph
+
+graph.style.use('fivethirtyeight')
+
+df = pd.read_csv('/data3/dova_projectX_analysis/dec13test/erica_drones_1to5.vcf', sep='\t', header=None, skiprows=9000)
+
+df.columns = ['scaf', 'pos', 'r1', 'ref', 'alt', 'qual', 'r2', 'r3', 'r4', 'r5', 'r6', 'r7', 'r8']
+
+graph.hist(df.query('qual < 3000')['qual'].dropna(), bins = 50, edgecolor = 'k')
+graph.show()
+
+df.query('qual > 10000')
+```
+
+
+
+unique drone snps
+
+```{python}
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as graph
+from tqdm import tqdm
+
+graph.style.use('fivethirtyeight')
+pd.options.display.max_rows = 999
+
+drone_files = [
+    '/data3/dova_projectX_analysis/feb4merge/drones_queen_snp.vcf',
+    '/data3/dova_projectX_analysis/feb4merge/drones_queen_filter1.vcf',
+    '/data3/dova_projectX_analysis/feb4merge/drones_queen_filter2.vcf',
+    '/data3/dova_projectX_analysis/feb4merge/drones_queen_filter3.vcf.recode.vcf',
+    '/data3/dova_projectX_analysis/feb4merge/drones_queen_filter4.vcf',
+    '/data3/dova_projectX_analysis/feb4merge/drones_queen_filter5.vcf',
+    '/data3/dova_projectX_analysis/feb4merge/drones_queen_filter6.vcf',
+    '/data3/dova_projectX_analysis/feb4merge/drones_queen_filter7.vcf',
+]
+
+def load_with_pd(filename):
+    df = pd.read_csv(filename, comment='#', sep='\t', header=None)
+    df.columns = ['scaf', 'pos', 'r1', 'ref', 'alt', 'qual', 'r2', 'info', 'r3', 'more_info']
+    return df
+
+
+def load(filename):
+    print('loading file: {}'.format(filename))
+    
+    dps = []
+    quals = []
+
+    with open(filename) as vcf:
+        for line in vcf:
+            if not line.startswith('#'):
+                info = line.split('\t')[7]
+                qual = line.split('\t')[5]
+
+                quals.append(float(qual))
+
+                depth = [int(i.split('=')[1]) for i in info.split(';') if i.startswith('DP')][0]
+                dps.append(depth)
+                
+    return dps, quals
+    
+    
+    
+data = [load(file) for file in drone_files]
+
+
+for file, sample in zip(drone_files, data):
+    print('Processing file {}'.format(file.split('/')[-1]))
+    dps, quals = sample
+    
+    # Quality
+    qual_filter = 5000
+    graph.hist([val for val in quals if val < qual_filter], edgecolor='black', bins=25)
+    graph.xlabel('Quality', fontsize=15)
+    graph.show()
+
+    print('Number of snps with large quality: {}'.format(len(quals) - len([val for val in quals if val < qual_filter])))
+
+    # Depth
+    dp_filter = 500
+    graph.hist([val for val in dps if val < dp_filter], edgecolor='black', bins=25)
+    graph.xlabel('Depth', fontsize=15)
+    graph.show()
+
+    print('Number of snps with large depth: {}'.format(len(quals) - len([val for val in quals if val < dp_filter])))
+    print('-' * 100)
+
+
+
+def count_num_of_drones(drone_file):
+    # Load drones
+    drone = pd.read_csv(drone_file, comment='#', sep='\t', header=None, dtype={0: object})
+    drone.columns = ['scaf', 'pos', 'r1', 'ref', 'alt', 'qual', 'r2', 'info', 'r3', 'd1', 'd2', 'd3', 'd4']
+    drone['index'] = drone['scaf'] + '-' + drone['pos'].astype(str) + '-' + drone['ref']
+
+    # Load queen
+    queen = pd.read_csv(queen_file, comment='#', sep='\t', header=None, dtype={0: object})
+    queen.columns = ['scaf', 'pos', 'r1', 'ref', 'alt', 'qual', 'r2', 'info', 'r3', 'q']
+    queen['index'] = queen['scaf'] + '-' + queen['pos'].astype(str) + '-' + queen['ref']
+
+    unique_drone = drone[~drone['index'].isin(queen['index'])]
+    mu_rate = len(unique_drone) / len(drone)
+    return mu_rate, unique_drone['d1'].str.startswith('1').astype(int) + unique_drone['d2'].str.startswith('1').astype(int) + unique_drone['d3'].str.startswith('1') + unique_drone['d4'].str.startswith('1')
+
+```
+

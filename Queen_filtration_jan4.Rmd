@@ -1,0 +1,172 @@
+---
+title: "Queen filtration steps"
+output: html_notebook
+---
+redo haplotype caller with -ploidy 2
+6 hour running time 
+```{bash}
+#dont use this -feb 8,2018
+#java -jar /usr/local/src/GenomeAnalysisTK.jar -T HaplotypeCaller -nct 40 -R /data2/Training_set/am45new.fasta -I Q11_BQSR.bam --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 --emitRefConfidence GVCF -ploidy 2 -o Q11_raw_variants.g.vcf
+```
+ignore above
+
+use:
+gatk --java-options "-Xmx4g" HaplotypeCaller  \
+   -R Homo_sapiens_assembly38.fasta \
+   -I input.bam \
+   -O output.g.vcf.gz \
+   -ERC GVCF
+run on bqsr.bam
+```{bash}
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T HaplotypeCaller -R /data2/Training_set/am45new.fasta -I Q11_BQSR.bam -o Q11_raw_variants.g.vcf.gz -ERC GVCF
+```
+
+run this on 2 samples, try to merge 
+
+old--> merge with nothing bc only one file- still need this step 
+7 min running time 
+```{bash}
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T GenotypeGVCFs -R /data2/Training_set/am45new.fasta --variant Q11_raw_variants.g.vcf -o Q11_raw_variants2.g.vcf
+```
+
+make INDEL file 
+2 min running time 
+```{bash}
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T SelectVariants -R /data2/Training_set/am45new.fasta -V Q11_raw_variants2.g.vcf -selectType INDEL -o Q11_indels.vcf
+```
+
+make SNP file 
+2 min running time 
+```{bash}
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T SelectVariants -R /data2/Training_set/am45new.fasta -V Q11_raw_variants2.g.vcf -selectType SNP -o Q11_snp.vcf
+```
+
+Variant filtration to mask bad SNP
+1 min 
+```{bash}
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/am45new.fasta -V Q11_snp.vcf -mask Q11_indels.vcf --maskExtension 5 --maskName "bad_snp" -o queen_filter1.vcf
+```
+
+version change
+```{bash}
+cat queen_filter1.vcf | vcf-convert -v 4.1 > queen_filter2.vcf
+```
+
+ filter only labels bad snps it doesnt remove them so you have to run this line to remove them out
+```{bash}
+vcftools --vcf queen_filter2.vcf --remove-filtered-all --recode --recode-INFO-all --out queen_filter3.vcf
+```
+
+Remove SNPs from unplaced scaffolds-- this is chromosome 17 and 18
+```{bash}
+grep -v '^17\.' queen_filter3.vcf.recode.vcf > queen_filter4.vcf 
+
+grep -v '^18\.' queen_filter4.vcf > queen_filter5.vcf
+```
+
+Remove SNPs with lowest 10% quality score - find minimum phred quality score (hers was 140)
+```{bash}
+python3 dova-pipeline-tools.py filter_qual queen_filter5.vcf queen_filter6.vcf 10
+```
+
+Filter of average depth (12 to 88 reads) 
+```{bash}
+python3 dova-pipeline-tools.py filter_depth queen_filter6.vcf queen_filter7.vcf 12 88
+```
+
+
+---------------------------------------------------------------------------------------------------
+
+*feb 5, 2018*
+
+*re-ran samtools sort on Q11_BQSR.bam and then re-ran the haplotype caller WITHOUT the -ploidy 2 in order to merge with the drone files (cannot merge -ploidy 1 and -ploidy 2)*
+start: 12:23pm
+end: 
+```{bash}
+samtools index Q11_BQSR.bam
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T HaplotypeCaller -nct 40 -R /data2/Training_set/am45new.fasta -I Q11_BQSR.bam --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 --emitRefConfidence GVCF -o Q11_raw_variants_no_p.g.vcf
+```
+
+
+merge queen and drone g.vcfs 
+```{r setup, include=FALSE}
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T GenotypeGVCFs -R /data2/Training_set/am45new.fasta --variant Q11D1_raw_variants.g.vcf --variant Q11D2_raw_variants.g.vcf --variant Q11D4_raw_variants.g.vcf --variant Q11D5_raw_variants.g.vcf --variant Q11_raw_variants_no_p.g.vcf -o drones_queen.g.vcf
+```
+
+
+make INDEL file 
+2 min running time 
+```{bash}
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T SelectVariants -R /data2/Training_set/am45new.fasta -V drones_queen.g.vcf -selectType INDEL -o drones_queen_indels.vcf
+```
+
+make SNP file 
+2 min running time 
+```{bash}
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T SelectVariants -R /data2/Training_set/am45new.fasta -V drones_queen.g.vcf -selectType SNP -o drones_queen_snp.vcf
+```
+
+Variant filtration to mask bad SNP
+1 min 
+```{bash}
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/am45new.fasta -V drones_queen_snp.vcf -mask drones_queen_indels.vcf --maskExtension 5 --maskName "bad_snp" -o drones_queen_filter1.vcf
+```
+for ambiguous sites - 
+
+version change
+```{bash}
+cat drones_queen_filter1.vcf | vcf-convert -v 4.1 > drones_queen_filter2.vcf
+```
+
+ filter only labels bad snps it doesnt remove them so you have to run this line to remove them out
+```{bash}
+vcftools --vcf drones_queen_filter2.vcf --remove-filtered-all --recode --recode-INFO-all --out drones_queen_filter3.vcf
+```
+
+Remove SNPs from unplaced scaffolds-- this is chromosome 17 and 18
+```{bash}
+grep -v '^17\.' drones_queen_filter3.vcf.recode.vcf > drones_queen_filter4.vcf 
+
+grep -v '^18\.' drones_queen_filter4.vcf > drones_queen_filter5.vcf 
+```
+
+*Harshil's code puts together the depth and quality, can specify parameters*
+
+```{bash}
+python3 /data3/dova_projectX_analysis/dec13test/dova-pipeline-tools.py drones_queen_filter5.vcf drones_queen_filter6.vcf 10 
+```
+
+
+
+
+Remove SNPs with lowest 10% quality score - find minimum phred quality score (hers was 140)
+```{bash}
+python3 /data3/dova-pipeline-tools.py filter drones_queen_filter5.vcf drones_queen_filter6.vcf qual 10 90
+```
+
+Filter of average depth (12 to 88 reads) *ask if need to x5*
+*when merged queen and drone use 1.5 IQR which is 53 and 168
+```{bash}
+python3 /data3/dova-pipeline-tools.py filter drones_queen_filter6.vcf drones_queen_filter7.vcf dep
+```
+how the depth filter works: (instead of IQR)
+1. orders data from largest to smaller
+2. measures distance to previous neighbour
+3. the difference increases when they become outlier
+4. second derivative (repeat process for the differences)- when it starts changing by a lot is the new filter -- can graph this process - see spike in outliers
+
+argmax- gives index where the data starts to be very different
+
+double sort the data- once before you apply the quality filter and then again after get the first derivative to get the second derivative to know where the cut off should be and where the outliers really begin 
+
+*finding the mutation rate*
+00 is homozygous for the reference
+1/1 is 2 alternate alleles 
+mutation rate: split the queen on the slash, make a list of queen 1/0 or 1/1 or 0/1 or 0/0- if any drones do not match the queen, then add it 
+if the queen has a . instead of a number, it isnt included (not assuming if its a mutation or not  a mutation, just excluded)
+
+mutation rate- how erica did it 
+mutation rate 2- using the whole genome as the denominator 
+
+include the fact that queen is diploid and drones are haploid so need to divide by 2 

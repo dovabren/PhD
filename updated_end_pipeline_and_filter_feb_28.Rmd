@@ -1,0 +1,122 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+Feb 28
+-may be problem with confusing too many files so started from BQSR.bam step again
+workflow: 
+samtools BQSR.bam --> Haplotype caller (output is g.vcf, use -ploidy 1 and -ploidy 2)--> merge g.vcf with genotype GCVF --> SelectVariants (SNP, output is snp.vcf; INDEL, output is indel.vcf) --> VariantRecalibrator (SNP and INDEL) --> ApplyRecalibration (SNP and INDEL)--> VariantFiltration (output is filter1) --> vcfconvert (output is filter2)--> removefilter (output is filter3) --> grep '17 (output is filter4) --> grep '18 (output is filter5)--> HARD FILTERING
+
+
+
+```{bash}
+samtools index Q11_BQSR.bam
+
+#Queen
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T HaplotypeCaller -nct 40 -R /data2/Training_set/am45new.fasta -I Q11_BQSR.bam --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 -ploidy 2 -o Q11_raw_variants.g.vcf.gz -ERC GVCF
+
+
+#Drones - for each drone 
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T HaplotypeCaller -nct 24 -R /data2/Training_set/am45new.fasta -I Q11D1_BQSR.bam --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 -ploidy 1 -o Q11D1_raw_variants.g.vcf.gz -ERC GVCF
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T HaplotypeCaller -nct 24 -R /data2/Training_set/am45new.fasta -I Q11D2_BQSR.bam --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 -ploidy 1 -o Q11D2_raw_variants.g.vcf.gz -ERC GVCF
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T HaplotypeCaller -nct 24 -R /data2/Training_set/am45new.fasta -I Q11D4_BQSR.bam --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 -ploidy 1 -o Q11D4_raw_variants.g.vcf.gz -ERC GVCF
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T HaplotypeCaller -nct 24 -R /data2/Training_set/am45new.fasta -I Q11D5_BQSR.bam --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 -ploidy 1 -o Q11D5_raw_variants.g.vcf.gz -ERC GVCF
+
+
+#merge drones and queen (with genotype GVCF)
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T GenotypeGVCFs -R /data2/Training_set/am45new.fasta --variant Q11D1_raw_variants.g.vcf.gz --variant Q11D2_raw_variants.g.vcf.gz --variant Q11D4_raw_variants.g.vcf.gz --variant Q11D5_raw_variants.g.vcf.gz --variant Q11_raw_variants.g.vcf.gz -o drones_queen.g.vcf
+
+#select variants SNP
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T SelectVariants -R /data2/Training_set/am45new.fasta -V drones_queen.g.vcf -selectType SNP -o drones_queen_snp.vcf
+
+# keep getting error with INDEL so tried using grep to make the INDEL file and then added headers-- then run select variants 
+grep -v INDEL drones_queen.g.vcf > drones_queen_indels1.vcf
+
+grep -v ‘#’ drones_queen_indels1.vcf | sort | less --chop-long-lines
+
+#select variants INDEL
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T SelectVariants -R /data2/Training_set/am45new.fasta -V drones_queen_indels1.vcf -selectType INDEL -o drones_queen_indels2.vcf
+
+#VariantRecalibration SNP
+java -Xmx4g -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantRecalibrator -R /data2/Training_set/am45new.fasta -input drones_queen_snp.vcf -recalFile drones_queen.recal -tranchesFile drones_queen.tranches -resource:hapmap,known=false,training=true,truth=true,prior=15.0 /data2/Training_set/SNP_TRAINING.vcf -an QD -an MQ -an MQRankSum -an ReadPosRankSum -an FS -an SOR -an DP -mode SNP -nt 4
+
+#Mar 1, 2018
+#INFO  08:03:14,547 VariantDataManager - QD:      mean = 26.03    standard deviation = 6.14
+#INFO  08:03:14,713 VariantDataManager - MQ:      mean = 59.45    standard deviation = 3.25
+#INFO  08:03:14,859 VariantDataManager - MQRankSum:       mean = 0.04     standard deviation = 0.96
+#INFO  08:03:15,028 VariantDataManager - ReadPosRankSum:          mean = 0.15     standard deviation = 1.20
+#INFO  08:03:15,196 VariantDataManager - FS:      mean = 2.36     standard deviation = 4.63
+#INFO  08:03:15,323 VariantDataManager - SOR:     mean = 0.86     standard deviation = 0.38
+#INFO  08:03:15,451 VariantDataManager - DP:      mean = 228.49   standard deviation = 278.16
+
+#ApplyRecalibration SNP -done mar 9 *this is the VQSR step
+java -Xmx3g -jar /usr/local/src/GenomeAnalysisTK.jar -T ApplyRecalibration -R /data2/Training_set/am45new.fasta -input drones_queen_snp.vcf -tranchesFile drones_queen.tranches -recalFile drones_queen.recal -o drones_queen_recalibrated_snp.vcf --ts_filter_level 99.5 -mode SNP
+
+#(do this again and include the R script? )
+
+#java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/am45new.fasta -V drones_queen_recalibrated_snp.vcf --filterExpression "MQ < 50.0" --filterName "LowMQ50" --filterExpression "QD < 5.0" --filterName "LowQD5" --filterExpression "FS > 60.0" --filterName "FS60" --filterExpression "MQRankSum < -5" --filterName "MQRSlow" --filterExpression "MQRankSum > 5" --filterName "MQRShigh" --filterExpression "ReadPosRankSum < -8.0" --filterName "RPRS" --filterExpression "SOR > 3" --filterName "SOR" -o drones_queen_filtered_hard.vcf
+
+#no MQranksum or readposranksum 
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/am45new.fasta -V drones_queen_recalibrated_snp.vcf --filterExpression "MQ < 50.0" --filterName "LowMQ50" -o drones_queen_filtered_hard_1.vcf
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/am45new.fasta -V drones_queen_filtered_hard_1.vcf --filterExpression "QD < 2.0" --filterName "LowQD2" -o drones_queen_filtered_hard_2.vcf
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/am45new.fasta -V drones_queen_filtered_hard_2.vcf --filterExpression "FS > 60.0" --filterName "FS60" -o drones_queen_filtered_hard_3.vcf
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/am45new.fasta -V drones_queen_filtered_hard_3.vcf  --filterExpression "SOR > 3" --filterName "SOR"  -o drones_queen_filtered_hard_4.vcf
+
+#MQranksum not defined
+#java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/am45new.fasta -V drones_queen_filtered_hard_4.vcf --filterExpression "MQRankSum < -5" --filterName "MQRSlow" --filterExpression "MQRankSum > 5" --filterName "MQRShigh" -o drones_queen_filtered_hard_5.vcf
+
+#RPRS not defined 
+#java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/am45new.fasta -V drones_queen_filtered_hard_4.vcf --filterExpression "ReadPosRankSum < -8.0" --filterName "RPRS" -o drones_queen_filtered_hard_5.vcf
+
+#select what has passed 
+#first we’re selecting the set of non-filtered (i.e. PASSing) variants using the tag –ef (--excludeFiltered)
+#java -Xmx1g -jar /usr/local/src/GenomeAnalysisTK.jar -T SelectVariants -R /data2/Training_set/am45new.fasta -V drones_queen_filtered_hard_4.vcf -ef -o drones_queen_filtered_hard.ef.vcf
+
+#Then we use the parameter –discordance to select all the variants that are not in the PASSing set.
+#java -Xmx1g -jar /usr/local/src/GenomeAnalysisTK.jar -T SelectVariants -R /data2/Training_set/am45new.fasta -V drones_queen_filtered_hard_4.vcf --discordance drones_queen_filtered_hard.ef.vcf -o drones_queen_filtered_hard_snp_only.vcf
+
+#VariantFiltration - done mar 10
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/am45new.fasta -V drones_queen_filtered_hard_5.vcf -mask drones_queen_indels2.vcf --maskExtension 5 --maskName "bad_snp" -o drones_queen_filter1_noINDEL.vcf
+
+
+cat drones_queen_filter1_noINDEL.vcf | vcf-convert -v 4.1 > drones_queen_filter2.vcf 
+
+#--remove-filtered-all will remove anything with a filter flag and not PASS 
+vcftools --vcf drones_queen_filter2.vcf --remove-filtered-all --recode --recode-INFO-all --out drones_queen_filter3.vcf
+
+grep -v '^17\.' drones_queen_filter3.vcf.recode.vcf > drones_queen_filter4.vcf
+
+grep -v '^18\.' drones_queen_filter4.vcf > drones_queen_filter5.vcf 
+```
+
+callable loci
+java -jar GenomeAnalysisTK.jar \
+     -T CallableLoci \
+     -R reference.fasta \
+     -I myreads.bam \
+     -summary table.txt \
+     -o callable_status.bed
+ 
+```{bash}
+#queen callable
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T CallableLoci -R /data2/Training_set/am45new.fasta -I Q11_BQSR.bam -summary queen_sum.txt -o queen_callable.bed
+
+#drone 1
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T CallableLoci -R /data2/Training_set/am45new.fasta -I Q11D1_BQSR.bam -summary Q11D1_sum.txt -o Q11D1_callable.bed
+#drone 2
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T CallableLoci -R /data2/Training_set/am45new.fasta -I Q11D2_BQSR.bam -summary Q11D2_sum.txt -o Q11D2_callable.bed
+#drone 4
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T CallableLoci -R /data2/Training_set/am45new.fasta -I Q11D4_BQSR.bam -summary Q11D4_sum.txt -o Q11D4_callable.bed
+#drone 5
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T CallableLoci -R /data2/Training_set/am45new.fasta -I Q11D5_BQSR.bam -summary Q11D5_sum.txt -o Q11D5_callable.bed
+```
+
+
+

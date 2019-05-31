@@ -1,0 +1,203 @@
+---
+title: "Path and Commands of ProjectX reanalysis"
+output:
+  html_document: default
+  pdf_document: default
+---
+all files were moved onto the bombus server
+open bombus server 
+ 
+```{bash}
+ssh dova@bombus.biol.yorku.ca
+password
+ls #find which directory you are in
+```
+
+if not at the root, move to root by typing "/"
+my Project X file is stored in data3 on this server 
+
+```{bash}
+cd /data3
+ls #list all files/ directories here, found project X
+cd dova_projectX_analysis/
+ls
+```
+only Q11D1, D4, D5 have both fwd and reverse - run trimmomatic on all 3
+
+check space on server 
+```{bash}
+df -h
+```
+
+
+Run trimmomatic 
+```{bash}
+java -jar /data4/Trimmomatic-0.36/trimmomatic-0.36.jar PE -threads 36 -phred33 HI.2178.008.Index_13.Q11D1_R1.fastq HI.2178.008.Index_13.Q11D1_R2.fastq Q11D1_paired_R1.fastq.gz Q11D1_unpaired_R1.fastq.gz Q11D1_paired_R2.fastq.gz Q11D1_unpaired_R2.fastq.gz ILLUMINACLIP:/usr/local/scripts/ADAPTER.fa:2:30:10 LEADING:20 TRAILING:20 SLIDINGWINDOW:20:25 MINLEN:35
+```
+original 2 files:
+HI.2178.008.Index_13.Q11D1_R1.fastq 
+HI.2178.008.Index_13.Q11D1_R2.fastq
+
+the new files that are made:
+Q11D1_paired_R1.fastq.gz 
+Q11D1_unpaired_R1 .fastq.gz 
+Q11D1_paired_R2.fastq.gz 
+Q11D1_unpaired_R2.fastq.gz
+
+once this is run, it will show a red flashing cursor, should take at least 1 hr to run, then continue with NGM
+(will run D2, D4, D5 in parallel with one command later)
+
+see what the file looks like 
+unpaired read file size is always smaller than the paired -double check
+```{bash}
+fastqc -t 36 *paired* #only get the files with paried in it 
+```
+when complete it will make you a file HTML file - copy them to local and look at them 
+first is a basic stats - how many reads, avg length, etc
+GC%
+
+**GC content around 32-34 then good, higher than 40 or as low as 27 then a problem bc this is an AT rich genome so expect around 32-- only looked at the paired filed in HTML (mine said 33 so this is fine)
+
+average should be higher than 90 since ours is 100bp
+
+when looking at the summary, there shouldnt be failures (red X and orange !)
+see file Tanu sends for possible errors and what to look for 
+
+the way to open this is to go through FileZilla- select a folder on the desktop (i created a new one called Fastqc) and drag the file from data3/dova_projectX_analysis/ html file to the bottom left files that are located on the local (my actual computer- can drop to certain folder or to .. which is the dovabrenman folder)
+
+
+GM : Filtered read alignment to the reference genome:
+```{bash}
+ngm -r /data2/Training_set/am45new.fasta -p -1 Q11D1_paired_R1.fastq.gz -2 Q11D1_paired_R2.fastq.gz -t 36 -b --rg-id Q11D1 --rg-sm Q11D1 --rg-lb PE --rg-pl Illumina -o Q11D1_ngm_aligned.bam
+
+```
+
+¬	-r : Reference genome sequence, the index file foe genome is also required in the same folder as of reference
+¬	-p : paired end reads, -1 (first pair of read i.e. R1) and -2 (second pair of read i.e. R2)
+¬	-t : number of threads
+¬	-b : output the bam file
+¬	--rg-id <string> : Adds RG:Z:<string> to all alignments in SAM/BAM
+¬	 --rg-sm<string> : RG header: Sample
+¬	 --rg-lb <string> : RG header: Library
+¬	--rg-pl <string> : RG header: Platform
+¬	 -o : output file
+Note: The RG header things are required for downstream processing og bam files
+
+Samtools
+```{bash}
+Samtools sort Q11D1_ngm_aligned.bam -o Q11D1_ngm_aligned_sorted_1.bam 
+
+Samtools index Q11D1_ngm_aligned_sorted_1.bam
+```
+
+sort so all unread files are at the bottom and all read are at the top-- sort with SAM tools -- ask it to sort the bam file we just made
+
+samtools sort old_name.bam new_name.bam
+samtool index new_name.bam
+
+
+Picard : marking  duplicate reads
+```{bash}
+java -jar /usr/local/src/picard-tools-2.1.0/picard.jar MarkDuplicates I=Q11D1_ngm_aligned_sorted.bam O=Q11D1_marked_duplicates.bam M=Q11D1_marked_dup_metrics.txt VALIDATION_STRINGENCY=SILENT MAX_FILE_HANDLES_FOR_READ_ENDS_MAP=1000
+
+samtools index Q11D1_marked_duplicates.bam
+```
+
+samtools index  Q11D1_marked_duplicates.bam
+
+Parameters:
+  I: Ngm aligned and samtools sorted bam file
+	O: Duplicate marked bam file
+	M: metrics report of duplicate mapping
+
+problem if temporary files are still there- should be gone when it sorts 
+she checked this by
+```{bash}
+samtools flagstat Q11D1_ngm_....
+```
+
+picard- gives marked duplicate 
+
+now use GATK- use this for recalibrating the bam file and then will do the SNP variant calling 
+GATK also a java so need to mention program you want to use -T, vase recalibrate, haplotype caller, -R for reference, the input file (marked duplicates) then training data set for SNP and INDEL and look in the file and see if they are really SNP and indel and then have a recall table 
+```{bash}
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T BaseRecalibrator -nct 36 -R /data2/Training_set/am45new.fasta -I Q11D1_marked_duplicates.bam --knownSites /data2/Training_set/INDEL_TRAINING.vcf --knownSites /data2/Training_set/SNP_TRAINING.vcf -o Q11D1.recall.table
+
+**delete Q11D1.recal.table
+```
+
+
+base quality scroll recalibration
+then step 2 you print the reads (under command)
+she first located the training data sets for INDEL
+```{bash}
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T PrintReads -R /data2/Training_set/am45new.fasta -nct 36 -I Q11D1_marked_duplicates.bam -BQSR Q11D1.recall.table -o Q11D1_BQSR.bam
+```
+
+-ncr 36 bc nothing else is running on bombus
+
+training data sets - compare to our data so we know that something are for sure INDELs or SNP and then look for other ones- helps to recalibrate the base that is nearby (look to see if there is low quality like 18 or 20) we want to be sure about the bases- we do sequence at high depth so want to minimize errors 
+
+make recal table and them make a bam file with the recalibrated base qualities
+
+-T (make a table) and then name it- in the first step its ____ and in the second it is PrintReads
+
+
+make a text file with all the names of the sample that need to be run 
+
+
+how to write in a loop
+```{bash}
+filename='samples1.txt'
+exec 4<$filename
+echo start
+while read -u4 p ; do
+(trimmomatic, all step here but modify)
+ex:
+picard MarkDuplicates I=$p.ngm.sorted.bam O=$p,sorted.dp.bam METRICS_FILES....
+
+
+can add in to delete the unneeded files - can delete all .bam files except the bqst bam files 
+```
+
+
+
+the queen file is the Q11_R1_fastq and the Q11_R2_fastq
+
+read.table :
+quality score- how many reads are there - how many observations, errors (not super useful to us)
+
+then run command 2 to print reads
+training data set is under data2
+last file is a bam file (from picard, last bam file we made)
+then the recal table that we made in the last step 
+then a new sample _BQSR.bam
+
+when finished this step, the data is finished processing the bam file and will continue with SNP calling
+(this is a long process, at least 1.5hrs for 1 file)
+
+haplotype caller (variant calling)
+```{bash}
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T HaplotypeCaller -R /data2/Training_set/am45new.fasta -I Q11D1_BQSR.bam --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 -o Q11D1_raw_variants.vcf
+```
+
+
+looking for new SNPs and we want a high confidence for calling and give output file Q11D1 -- vcf file is made here 
+
+
+
+then filter the VCF differently - merge then filter or the opposite (ask Amro) decide on filtration path if we want it to be the exact same thing 
+
+*Dec13*
+we made a new folder with the fastq files called dec13test
+this is where the loop will be run (command is "bash" bc even though it is a text file we want it to be read as bash commands and not just text)
+can check on the status of the loop by using "ls" to ensure that new files are being made or by using "htop" to see the progress, 
+
+run a second screen- this will run on the server so that if i close my laptop it will still work (not being run off of my machine)
+```{bash}
+screen -S dec13test -L
+bash Loop_ProjectX
+```
+
+for loop: dont need quotes around names if not in loop
+

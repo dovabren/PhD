@@ -1,0 +1,256 @@
+---
+title: "Erica’s thesis through the pipeline"
+output: html_document
+---
+steps gone through with Tanushree:
+*example is all on Q11D1, see Loop_projectX for more than one file*
+log into apis server
+copy of raw data remade (then found fastq file that was already remade)
+everyone works off of the media file in apis
+Erica's data is in here, too
+need to check the space -h/media/data1-- cannot exceed the space or it will crash, can copy data from apis to bombus before you run -- makes temporary files so the size of your file multiplied by at least 4 is how much space you need 
+
+
+```{bash}
+cd/media/data1/projectx/ fastq #there are queen (Q11) and drone (Q11D) data here
+
+#check space in server
+df -h/media/data1
+```
+move to bombus server 
+log into other server 
+
+to stop any process in the middle do CTRL+C
+
+now log into bombus server 
+```{bash}
+#my file to use
+dova_projectX_analysis
+```
+
+first run trimmomatic command before the filtration- filter for low quality and adapter content 
+given options like java-jar Trimmomatic.jar PE (parents) 
+R1 and R2 are fwd and the reverse of the same thing
+threads- they do them in parallel -48 threads on each server so do around 36 (not more than 40 bc the threads are being used)
+
+Trimmomatic:
+```{bash}
+java -jar /data4/Trimmomatic-0.36/trimmomatic-0.36.jar PE -threads 36 -phred33 HI.2178.008.Index_13.Q11D1_R1.fastq  HI.2178.008.Index_13.Q11D1_R2.fastq  Q11D1_paired_R1.fastq.gz  Q11D1_unpaired_R1 .fastq.gz  Q11D1_paired_R2.fastq.gz  Q11D1_unpaired_R2.fastq.gz ILLUMINACLIP :/usr/local/scripts/ADAPTER.fa:2:30:10 LEADING:20 TRAILING:20 SLIDINGWINDOW:20:25 MINLEN:35
+
+```
+Parameters:
+¬	PE : Paired End
+¬	threads : number of threads
+¬	PHRED33: Convert quality scores to Phred-33
+¬	ILLUMINACLIP: Cut adapter and other illumina-specific sequences from the read
+¬	ADAPTER.fa : fasta sequences for universal Illumina adapter and index sequences from Illumina adapter pdf file. The contents of adapter file are there in supplementary data S1
+¬	LEADING:<quality>: Specifies the minimum quality required to keep a base
+¬	TRAILING:<quality> : Specifies the minimum quality required to keep a base
+¬	SLIDINGWINDOW:<windowSize>:<requiredQuality>
+¬	windowSize: specifies the number of bases to average across
+¬	requiredQuality: specifies the average quality required.
+¬	MINLEN:<length>: Specifies the minimum length of reads to be kept
+
+
+will make 4 files for each sample- sometimes wont have R1 and R2 so the leftovers go to an unpaired file (we only keep the ones that are high quality and that they have adapters, they are not yet mapped)
+need to find adapter and if they are on both R1 and R2 then trim them a bit 
+
+high quality- from 100bp reads, we want minimum 35 bp bc the adapter around 20 so minumum is 35 bp so can get some good quality there (if 150bp reads, then look for minimum of 50bp length)
+
+next you will get the paired read and then do the FastQC- look at the quality of the data and see if its acceptable or if you want more strict filtering applied to it 
+will get a graphical output that tells you what it looks like
+
+then can do other analysis -- map the reads to the reference genome apis mellifera and then NGM tool and give it the options 
+
+
+FastQC:
+```{bash}
+locate am45new #this is the reference genome in fasta format
+#will tell you what its called on the bombus server 
+NGM -r
+
+#command
+fastqc –t 36 *paired*
+
+```
+¬	Input : Filtered fastq files
+¬	-t/–threads: Specifies the number of files which can be processed                     simultaneously.  Each thread will be allocated 250MB of memory 
+
+Note: The following QC indicators should not have the “FAIL” Red Cross in the FastQC report.
+¬	 a) adapter_content
+¬	 b) sequence_duplication_levels 
+¬	 c) per_base_sequence_quality
+¬	 d) per_sequence_gc_content 
+¬	 e) overrepresented_sequences 
+¬	 f) GC content range (29 min - 37 max)
+
+-p paired reads 
+-1 R1
+-2 R2
+then how many threads to use
+-b for bam file 
+
+
+check the location of the program, let it autocomplete if its there so then have to look up the path 
+
+htop to see what else is going on- they should mostly be blank
+make sure nothing else is running so that you wont break theres or your prgams
+
+output files are the HI.2178.008_______R1 and then the _______R2 
+
+have to run the drones individually 
+
+can do 8 samples in a folder and it will execute the command if you run a loop (look up for later)
+
+each sample takes about 2 hours to run 
+
+see what the file looks like 
+unpaired read file size is always smaller than the paired -double check
+```{bash}
+fastqc -t 36 *paired* #only get the files with paried in it 
+```
+when complete it will make you a file HTML file - copy them to local and look at them 
+first is a basic stats - how many reads, avg length, etc
+GC%
+
+average should be higher than 90 since ours is 100bp
+
+when looking at the summary, there shouldnt be failures (red X and oragne !)
+see file Tanu sends for possible errors and what to look for 
+
+NGM : Filtered read alignment to the reference genome:
+```{bash}
+ngm -r /data2/Training_set/am45new.fasta -p -1 Q11D1_paired_R1.fastq -2 Q11D1_paired_R2.fastq -t 36  -b --rg-id Q11D1 --rg-sm Q11D1 --rg-lb PE --rg-pl Illumina -o Q11D1_ngm_aligned.bam
+```
+
+¬	-r : Reference genome sequence, the index file foe genome is also required in the same folder as of reference
+¬	-p : paired end reads, -1 (first pair of read i.e. R1) and -2 (second pair of read i.e. R2)
+¬	-t : number of threads
+¬	-b : output the bam file
+¬	--rg-id <string> : Adds RG:Z:<string> to all alignments in SAM/BAM
+¬	 --rg-sm<string> : RG header: Sample
+¬	 --rg-lb <string> : RG header: Library
+¬	--rg-pl <string> : RG header: Platform
+¬	 -o : output file
+Note: The RG header things are required for downstream processing og bam files
+
+
+downstream analysis with NGM aligner - maps to ref genome and produce a bam file
+(can combine many files later, now only have 4 drones)
+NGM will do the mapping
+
+rg-id for bam file, needs sample name after it Q11D1
+
+after command entered for NGM, will give stats of how many were mapped to the reference genome - need this info before joining files together so you know the max stats of your data 
+
+output is a bam file - will make 3 versions of a bam file 
+the bam file has all info that was present in the fastq file - which reads were mapped - need to sort it before we analyze it further 
+
+Samtools:
+```{bash}
+samtools sort Q11D1_ngm_aligned.bam -o Q11D1_ngm_aligned_sorted.bam 
+samtools index Q11D1_ngm_aligned_sorted.bam
+```
+
+sort so all unread files are at the bottom and all read are at the top-- sort with SAM tools -- ask it to sort the bam file we just made
+
+samtools sort old_name.bam new_name.bam
+samtool index new_name.bam
+
+Picard : marking  duplicate reads
+```{bash}
+java -jar /usr/local/src/picard-tools-2.1.0/picard.jar MarkDuplicates I=Q11D1_ngm_aligned_sorted.bam O=Q11D1_marked_duplicates.bam M= Q11D1_marked_dup_metrics.txt VALIDATION_STRINGENCY=SILENT MAX_FILE_HANDLES_FOR_READ_ENDS_MAP=1000
+
+
+samtools index Q11D1_marked_duplicates.bam
+```
+
+Parameters:
+¬	I: Ngm aligned and samtools sorted bam file
+¬	O: Duplicate marked bam file
+¬	M: metrics report of duplicate mapping
+
+next is picard to mark duplicate reads- sometimes in genome, there are too many reads so remove duplicate reads that might get mapped to different places or if sequenced too many times (also a java program)
+
+do picard on NGM sorted aligned file 
+say we dont want any DNA fragments, read cut off is it 1000- 100% similar , 1000 times then discard it 
+
+how many reads, how many times etc is put into a _metrics file 
+
+reindex bc some files are now discarded so reindex- dont need to sort the whole thing 
+
+--finish until here and practice - what does everything mean, how do we get the stats of the bam files (SAM tools)- how many reads are properly saved
+parameter in sam tools 
+
+```{bash}
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T BaseRecalibrator -nct 36 -R /data2/Training_set/am45new.fasta -I Q11D1_marked_duplicates.bam --knownSites /data2/Training_set/INDEL_TRAINING.vcf --knownSites /data2/Training_set/SNP_TRAINING.vcf -o Q11D1.recal.table
+```
+
+
+
+```{bash}
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T PrintReads -R /data2/Training_set/am45new.fasta -nct 36 -I Q11D1_marked_duplicates.bam -BQSR Q11D1.recal.table -o Q11D1_BQSR.bam
+```
+
+*STOP HERE IF USING KATIE"S HAPLOTYPE CALLER*"
+
+the GVCF command is going to insert the reference genome where ever there is missing data or information 
+make this GVCF then merge the GVCF and make just a VCF that will be fed into filtration 
+```{bash}
+#old haplotype caller 
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T HaplotypeCaller -R /data2/Training_set/am45new.fasta -I $sid"_BQSR.bam" --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 -o $sid"_raw_variants.g.vcf"
+
+#new- for each drone
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T HaplotypeCaller -nct 40 -R /data2/Training_set/am45new.fasta -I Q11D1_BQSR.bam --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 --emitRefConfidence GVCF -ploidy 1 -o Q11D1_raw_variants.g.vcf
+
+#new- queen
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T HaplotypeCaller -nct 40 -R /data2/Training_set/am45new.fasta -I Q11_BQSR.bam --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 --emitRefConfidence GVCF -ploidy 2 -o Q11_raw_variants.g.vcf
+```
+
+ run the command above on all the drones BQSR bams to produce their gvcf files, then you have to merge the gvcf files using this command
+```{bash}
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T HaplotypeCaller -R /data2/Training_set/am45new.fasta --variant Q11D1_raw_variants.g.vcf --variant Q11D2_raw_variants.g.vcf --variant Q11D3_raw_variants.g.vcf --variant Q11D4_raw_variants.g.vcf --variant Q11D5_raw_variants.g.vcf -o drones_1to5.g.vcf 
+```
+
+*katie's haplotype caller*
+```{bash}
+#use 1 for haploid, 2 for diploid
+gatk  -T HaplotypeCaller -nct 20 -R reference.fa -I File.Bam -emitRefConfidence GVCF -variant_index_type LINEAR -variant_index_parameter 128000 -ploidy 2 -o OutFile.snps.indels.g.vcf 
+
+#not sure when to use this
+gatk -T CombineGVCFs -R reference.fa --variant --variant --variant ... -o cohort.g.vcf
+```
+
+the join genotype is going to combine many GVCFs together when working with many (100+) drones 
+at this point will need to filter based on chromosome (ASK HOW TO SPLIT THIS UP) bc it will otherwise take too long so split to 1000 reads at a time 
+
+this is only going to call alternate alleles - if there is no data present it might think this is a mistake 
+
+can tell it that it is haploid or diploid with the -ploidy 2 or 1 commans -->this step is instead of using the heterozygous SNP filter 
+
+convert g.vcf into vcf
+```{bash}
+#from katie, run in parallel windows
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T GenotypeGVCFs -R /data2/Training_set/am45new.fasta -V sample1.g.vcf -V sample2.g.vcf -V sample3.g.vcf ...ect -o output.final.vcf
+
+#run one at a time 
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T GenotypeGVCFs -R /data2/Training_set/am45new.fasta -V Q11D1_raw_variants.g.vcf -o Q11D1_raw_variants_final.vcf
+```
+
+merge
+```{bash}
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T GenotypeGVCFs -R /data2/Training_set/am45new.fasta --variant Q11D1_raw_variants.g.vcf --variant Q11D2_raw_variants.g.vcf --variant Q11D4_raw_variants.g.vcf --variant Q11D5_raw_variants.g.vcf -o drones_1to5.g.vcf
+```
+
+
+this is where the loop will be run (command is "bash" bc even though it is a text file we want it to be read as bash commands and not just text)
+can check on the status of the loop by using "ls" to ensure that new files are being made or by using "htop" to see the progress, 
+
+run a second screen- this will run on the server so that if i close my laptop it will still work (not being run off of my machine)
+```{bash}
+screen -S name -L
+bash Loop_ProjectX
+bash queen-pipeline
+```
+
+for loop: dont need quotes around names if not in loop

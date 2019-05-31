@@ -1,0 +1,88 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+downstream filtration cleaned 
+after using g.vcf
+keep only indels- this will be used as a reference for later with GATK
+**DONT do this for queen- use the drone INDEL file and ask Tanushree when she gets back** 
+
+```{bash}
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T SelectVariants -R /data2/Training_set/am45new.fasta -V drones_1to5.g.vcf -selectType INDEL -o drones_1to5_indels.vcf
+```
+time to complete: immediately 
+
+keep only SNPs
+**still do this for queen**
+```{bash}
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T SelectVariants -R /data2/Training_set/am45new.fasta -V drones_1to5.g.vcf -selectType SNP -o drones_1to5_snp.vcf
+```
+time to complete: immediately 
+
+GATK variant filtrtion
+check sorting of each file -- harshil said this will sort well 
+ 
+```{bash}
+#dont need to use this one bc it sorted properly
+python3 dova-pipeline-tools.py sort_vcf  <input.vcf> <output.vcf>
+```
+
+
+5bp indel
+```{bash}
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/am45new.fasta -V drones_1to5_snp.vcf -mask drones_1to5_indels.vcf --maskExtension 5 --maskName "bad_snp" -o drones_1to5_snps_filter1.vcf 
+```
+time to complete: immediately 
+
+After the filter step above with gatk variant filtration 
+you need to change the version of the vcf with:
+*still do this for queen*
+```{bash}
+cat drones_1to5_snps_filter1.vcf | vcf-convert -v 4.1 > drones_1to5_snps_filter2.vcf 
+```
+time to complete:
+
+so the filter only labels bad snps it doesnt remove them so you have to run this line to remove them out
+*still do this for queen*
+```{bash}
+vcftools --vcf drones_1to5_snps_filter2.vcf --remove-filtered-all --recode --recode-INFO-all --out drones_1to5_snps_filter3.vcf 
+```
+
+output here is: drones_1to5_snps_filter3.vcf.log  drones_1to5_snps_filter3.vcf.recode.vcf
+
+#Remove SNPs from unplaced scaffolds
+this is chromosome 17 and 18
+```{bash}
+grep -v '^17\.' drones_1to5_snps_filter3.vcf > drones_1to5_snp_filter4.vcf 
+
+#ask if should remove 18 bc its mitochondrial 
+grep -v '^18\.' drones_1to5_snp_filter4.vcf > drones_1to5_snp_filter5.vcf 
+```
+
+#Remove SNPs with lowest 10% quality score - find minimum phred quality score (hers was 140)
+awk {'print $6'} 
+--> within curly brackets, tell it which column
+if only printing the quality score then pipe it to |less --chop-long-lines because it will print all the quality scores and keep printing 
+need to also get rid of headers before sorting
+sort: find 6th column then stop at 6th (thats the comma)
+```{bash}
+#find quality
+grep -v '#' drones_1to5_snp_filter5.vcf | less --chop-long-lines 
+
+#make list of headers and make file that is header-less and pipe it to sort on the 6th column and show
+grep -v '#' drones_1to5_snp_filter5.vcf| sort -nk6,6 | less --chop-long-lines
+```
+
+Removal of heterozygous SNPs called in drones
+*ignore this now bc we did it before with the haplotype caller*
+
+#Filter of average depth (12 to 88 reads)-- need to multiply by 4 bc merged 4 drone files (changed this in harshil's python code stored on server)
+```{bash}
+python3 dova-pipeline-tools.py filter_vcf drones_1to5_snp_filter5.vcf drones_1to5_snp_filter6.vcf|
+```
+
+
+#Hand filtering of SNPs 
+
+
+
