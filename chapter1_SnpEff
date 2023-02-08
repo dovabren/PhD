@@ -1,0 +1,47 @@
+ java -Xmx4g -jar /data3/dova_nanuq_raw_data/snpEff/snpEff.jar -ud 1000 -c /data3/dova_nanuq_raw_data/snpEff/snpEff.config -v ASM165200v1 Soc_Sol_filter_3_025.vcf  > Soc_Sol_filter_3_025_ann_1kb.vcf
+ 
+ 
+ cat Soc_Sol_filter_3_025.vcf | grep '^#'> Soc_Sol_filter_3_025_header.txt
+
+1. SnpEff for all SNPs
+
+vcf_fst_merge_all_oct13.vcf
+
+ cat Soc_Sol_filter_3_025_header.txt vcf_fst_merge_all_oct13.vcf > vcf_fst_merge_all_oct13_header.vcf 
+    
+java -Xmx4g -jar /data3/dova_nanuq_raw_data/snpEff/snpEff.jar -c /data3/dova_nanuq_raw_data/snpEff/snpEff.config -v ASM165200v1 vcf_fst_merge_all_oct13.vcf  > vcf_fst_merge_all_oct13_header_ann.vcf 
+
+
+mv snpEff_summary.html snpEff_summary_all_fst_oct13.html
+
+mv snpEff_genes.txt snpEff_genes_all_fst_oct13.txt
+
+
+
+
+
+
+2. SnpEff for snps in top 5%
+ find top % from p1_p2.fst 
+
+ 
+ cat Soc_Sol_filter_3_025_header.txt vcf_fst_merge_top5_oct13.vcf > vcf_fst_merge_top5_oct13_header.vcf 
+ 
+ 
+ java -Xmx4g -jar /data3/dova_nanuq_raw_data/snpEff/snpEff.jar -c /data3/dova_nanuq_raw_data/snpEff/snpEff.config -v ASM165200v1 vcf_fst_merge_top5_oct13_header.vcf  > vcf_fst_merge_top5_oct13_header_ann.vcf 
+ 
+ mv snpEff_summary.html snpEff_summary_top5_fst_oct13.html
+
+mv snpEff_genes.txt snpEff_genes_top5_fst_oct13.txt
+ 
+3. SnpEff for snps in top 1%
+
+ cat Soc_Sol_filter_3_025_header.txt vcf_fst_merge_top1_oct13.vcf > vcf_fst_merge_top1_oct13_header.vcf 
+ 
+ 
+ java -Xmx4g -jar /data3/dova_nanuq_raw_data/snpEff/snpEff.jar -c /data3/dova_nanuq_raw_data/snpEff/snpEff.config -v ASM165200v1 vcf_fst_merge_top1_oct13_header.vcf  > vcf_fst_merge_top1_oct13_header_ann.vcf 
+ 
+ 
+ mv snpEff_summary.html snpEff_summary_top1_fst_oct13.html
+
+mv snpEff_genes.txt snpEff_genes_top1_fst_oct13.txt

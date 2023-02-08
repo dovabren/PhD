@@ -1,0 +1,26 @@
+PCA with python
+1. genotype matrix
+
+%%bash
+
+# compress the VCF file if not already done (creates .vcf.gz)
+bgzip data.vcf
+
+bgzip Soc_Sol_filter_3_025.vcf
+
+# tabix index the compressed VCF (creates .vcf.gz.tbi)
+tabix Soc_Sol_filter_3_025.vcf.gz
+
+# remove multi-allelic SNPs and INDELs and PIPE to next command
+bcftools view -m2 -M2 -i'CIGAR="1X" & QUAL>30' Soc_Sol_filter_3_025.vcf.gz -Ou |
+
+    # remove extra annotations/formatting info and save to new .vcf
+    bcftools annotate -x FORMAT,INFO  > Soc_Sol_filter_3_025.cleaned.vcf
+
+# recompress the final file (create .vcf.gz)
+bgzip Soc_Sol_filter_3_025.cleaned.vcf
+
+
+#impute missing genotypes- 15 min
+java -Xmx24g -jar beagle.18May20.d20.jar gt=Soc_Sol_filter_3_025_zip.vcf.gz nthreads=8 iterations=30 impute=true out=Soc_Sol_filter_3_025_imputed_ref
+

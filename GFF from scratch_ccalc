@@ -1,0 +1,197 @@
+june 18-----
+#(tanushree help)
+#blastn between both sequences 
+#standalone blast
+#formatdb
+
+ formatdb -i ASM165200v1.fa -p F -o F
+
+blastn -query CCalc_v1.1.draft_genome_remap.v5c_3G2.gff.all.maker.transcripts.fasta.filtered -db ASM165200v1 -out xaa.txt -outfmt 7 -evalue 1e-00 -num_threads 8 -max_target_seqs 3
+
+
+
+NCBI -DB
+and those with e-value 0 and 100% identity can go in the making of gff file
+
+ blastn -query ASM165200v1_correct_geneID.fa -db ASM165200v1.fa -out ASM165200v1_correct_geneID.txt -outfmt 7 -evalue 1e-00 -num_threads 1
+6 -max_target_seqs 3
+
+
+
+-----june 18/19
+
+issue with jupyter notebook, try uninstalling and reinstalling 
+
+
+#uninstall jupyter 
+sudo python3 -m pip uninstall -y jupyter jupyter_core jupyter-client jupyter-console notebook qtconsole nbconvert nbformat
+
+#install notebook
+conda install -c conda-forge notebook
+
+
+from __future__ import print_function
+import gffpandas.gffpandas as gffpd
+import pandas as pd
+import numpy as np
+
+gff_refseq = pd.read_table('/data3/dova_nanuq_raw_data/genes_refseq.gff', comment="#", sep = "\t", names = ['seqname', 'source', 'feature', 'start' , 'end', 'score', 'strand', 'frame', 'attribute'])
+gff_refseq
+
+#read blast resuts as a table in pandas 
+blast_names = pd.read_table('ASM165200v1_correct_geneID.txt', header = None, sep='\t')
+blast_names.columns = ['qseqid','seqname','pident','length', 'mismatch', 'gapopen', 'qstart', 'qend', 'sstart','send','evalue','bitscore']
+blast_names
+
+#merge both dataframes based on 'seqname' in both (NW_ refseq name that matches, only keep those that are found in the gff file)
+#how='inner' and how='left' give same result 
+merged = pd.merge(gff_refseq, blast_names, on=['seqname'], how='inner')
+merged.head() 
+
+merged.drop(['pident','length','mismatch', 'gapopen', 'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore'], axis=1, inplace=True)
+merged
+
+#move last column to the first place 
+cols = merged.columns.tolist()
+cols = cols[-1:] + cols[:-1]
+merged = merged[cols]
+merged
+
+merged.drop(['seqname'], axis=1, inplace=True)
+merged
+
+merged.to_csv('genes_ccalc.csv',sep = "\t", index=False)
+
+
+#remove header in bash
+grep -v '\qseqid' genes_ccalc.csv > genes_ccalc_1.csv  
+
+
+
+#extract header of old gff file, merge with csv made in python
+cat genes_refseq.gff | grep '^#' | sed 's/=/\,/g' > header_gff.txt
+
+cat header_gff.txt genes_ccalc_1.csv  > genes_ccalc.gff
+
+
+#test with ASM build -- move gene_ccalc.gff to snpeff/data/ASM folder
+
+java -jar -Xmx4g snpEff/snpEff.jar build -gff3 -v ASM165200v1
+
+
+java -Xmx4g -jar /data3/dova_nanuq_raw_data/snpEff/snpEff.jar -c /data3/dova_nanuq_raw_data/snpEff/snpEff.config -v ASM165200v1 Soc_Sol_filter_3.vcf > Soc_Sol_filter_3.ann.vcf
+
+
+
+-------june 22-----
+#compare ccalc to d_mel genome, get gene names in python and run through DAVID
+samtools faidx D_mel_genome.fna
+
+formatdb -i D_mel_genome.fna -p F -o F
+
+samtools faidx amelhav3.1.fa
+
+formatdb -i amelhav3.1.fa -p F -o F
+
+blastn -query snpEff/data/genomes/ASM165200v1_refseq.fa -db snpEff/data/genomes/amelhav3.1.fa -out ccalc_amel.txt -outfmt 7 -evalue 1e-00 -num_threads 8 -max_target_seqs 3
+
+
+tblastx -query snpEff/data/genomes/ASM165200v1_refseq.fa -db D_mel_genome.fna -out ccalc_droso.txt -outfmt 7 -evalue 1e-00 -num_threads 8 -max_target_seqs 3
+
+
+
+"variants_effect_non_coding_transcript_variant","variants_effect_splice_acceptor_variant","variants_effect_splice_donor_variant","variants_effect_splice_region_variant", "variants_effect_start_lost", "variants_effect_stop_gained","variants_effect_stop_lost", "variants_effect_stop_retained_variant","variants_effect_synonymous_variant","variants_effect_upstream_gene_variant"])
+
+
+#separate gff_Refseq attribute based on ;
+df1 = gff_refseq['attribute'].str.split(pat=";", expand=True)
+
+#expand just the attribute row 
+df2 = df1[0].str.split(pat='=', n=1, expand=True)
+df2 = df2[1]
+#df2
+
+gff_attribute_ID = pd.concat([gff_refseq, df2], axis = 1)
+gff_attribute_ID.drop(['source','feature','start','end','score','strand','frame','attribute'], axis=1, inplace=True)
+gff_attribute_ID.columns = (['seqname','ID'])
+#gff_attribute_ID
+
+
+ccalc_go = pd.read_csv('ccalc_OGS_v2.B2G_wIPR_annexed.annot', sep='\t', comment='#', header=None) 
+ccalc_go.columns = (['qseqid','GO','annotation'])
+
+merged_seqname = pd.merge(blast_names, gff_attribute_ID, on=['seqname'], how='inner')
+merged_seqname.head() 
+
+merged2 = pd.merge(snpeff_output, merged_seqname, on='ID', how='left')
+
+ccalc_from_snpeff = merged2[['qseqid','ID','seqname']]
+
+merged3 = pd.merge(ccalc_from_snpeff, ccalc_go, on='qseqid', how='left')
+merged3
+
+merged4 = pd.merge(merged3, ccalc_droso_blast, on='qseqid', how='left')
+merged4
+
+merged4.to_csv('all_names_converted.txt',sep = "\t", index=False)
+
+
+NW_ccalc_GO_ID = pd.read_table('all_names_converted.txt', sep='\t')
+NW_ccalc_GO_ID.columns = [['qseqid','ID','seqname','GO', 'annotation','droso']]
+NW_ccalc_GO_ID.drop_duplicates(inplace=True)
+
+
+
+
+
+
+samtools faidx amel_OGSv3.2_transcripts.fa
+
+formatdb -i amel_OGSv3.2_transcripts.fa -p F -o F
+
+blastn -query snpEff/data/genomes/ASM165200v1_refseq.fa -db amel_OGSv3.2_transcripts.fa -out NW_amel_gene_name.txt -outfmt 7 -evalue 1e-00 -num_threads 8 -max_target_seqs 3
+
+
+#repeat with only the sequences found in Soc_Sol_filter_3.vcf
+
+#bedtools getfasta -fi snpEff/data/genomes/ASM165200v1_refseq.fa -bed Soc_Sol_filter_3.vcf -split -name -fo ccalc_snp_to_seq
+
+bgzip -c Soc_Sol_filter_3_tofasta.vcf > Soc_Sol_filter_3_tofasta.vcf.gz
+tabix -p vcf Soc_Sol_filter_3_tofasta.vcf.gz
+
+cat snpEff/data/genomes/ASM165200v1_refseq.fa | bcftools consensus Soc_Sol_filter_3_tofasta.vcf.gz > ccalc_snp_to_seq.fa
+
+formatdb -i amel_OGSv3.2_transcripts.fa -p F -o F
+
+blastn -query ccalc_snp_to_seq.fa -db amel_OGSv3.2_transcripts.fa -out NW_amel_from_snp.txt -outfmt 7 -evalue 1e-00 -num_threads 8 -max_target_seqs 3
+
+
+
+grep -c "^>" ccalc_snp_to_seq.fa
+grep -c "^>" snpEff/data/genomes/ASM165200v1_refseq.fa
+
+
+
+#make sure sandra's genome and downloaded from ncbi are the same
+CCalc_v1.1.draft_genome_remap.v5c_3G2.gff.all.maker.transcripts.fasta.filtered
+
+ASM165200v1_refseq.fa
+
+
+samtools faidx ASM165200v1_refseq.fa
+
+formatdb -i ASM165200v1_refseq.fa -p F -o F
+
+blastn -query CCalc_v1.1.draft_genome_remap.v5c_3G2.gff.all.maker.transcripts.fasta.filtered -db ASM165200v1_refseq.fa -out ccalc_NW_blast.txt -outfmt 7 -evalue 1e-00 -num_threads 8 -max_target_seqs 3
+
+
+
+
+-----aug 12
+
+formatdb -i /data3/dova_nanuq_raw_data/snpEff/data/genomes/amelhav3.1.fa -p F -o F
+
+formatdb -i /data3/dova_nanuq_raw_data/snpEff/data/genomes/ASM165200v1_refseq.fa -p F -o F
+
+
+blastn -query /data3/dova_nanuq_raw_data/snpEff/data/genomes/ASM165200v1_refseq.fa -db /data3/dova_nanuq_raw_data/snpEff/data/genomes/amelhav3.1.fa -out ASM165200v1_refseq_amelhav3.1.txt -outfmt 7 -evalue 1e-00 -num_threads 8 -max_target_seqs 3

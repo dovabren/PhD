@@ -1,0 +1,406 @@
+You will need the package devtools to be able to install the devel version of adegenet. To install devtools:
+
+install.packages("devtools")
+To install adegenet devel:
+
+library(devtools)
+install_github("thibautjombart/adegenet")
+library("adegenet")
+
+
+
+
+
+
+https://grunwaldlab.github.io/Population_Genetics_in_R/analysis_of_genome.html
+
+>library('vcfR')
+>vcf <- read.vcfR("Soc_Sol_filter_3.vcf")
+
+Scanning file to determine attributes.
+File attributes:
+  meta lines: 50629
+  header_line: 50630
+  variant count: 1000319
+  column count: 29
+Meta line 50629 read in.
+All meta lines processed.
+gt matrix initialized.
+Character matrix gt created.
+  Character matrix gt rows: 1000319
+  Character matrix gt cols: 29
+  skip: 0
+  nrows: 1000319
+  row_num: 0
+Processed variant: 1000319
+All variants processed
+
+>vcf
+
+***** Object of Class vcfR *****
+20 samples
+15637 CHROMs
+1,000,319 variants
+Object size: 444 Mb
+0 percent missing data
+*****        *****         *****
+
+>x <- vcfR2genlight(vcf)
+
+
+
+
+>x
+
+
+
+
+
+https://wurmlab.github.io/genomicscourse/2016-SIB/practicals/population_genetics/popgen
+
+bcftools query Soc_Sol_filter_3.vcf -f '%CHROM\t%POS[\t%GT]\n' > Soc_Sol_matrix.txt
+
+# get sample names
+bcftools query -l Soc_Sol_filter_3.vcf > Soc_Sol_sample_names.txt
+
+install_github("thibautjombart/adegenet", dependencies = TRUE, R_REMOTES_NO_ERRORS_FROM_WARNINGS="true")
+
+Soc_Sol_geno_may18.vcf
+
+vcf2lfmm("Soc_Sol_filter_3.vcf", force = TRUE)
+
+
+
+(bcftools query -l Soc_Sol_filter_3.vcf | tr "\n" "\t" &&  bcftools query -f '[\t%GT]\n' Soc_Sol_filter_3.vcf) > Soc_Sol_matrix.txt
+
+library(LEA)
+vcf2lfmm("Soc_Sol_matrix.vcf", force = TRUE)
+
+------------may 19
+ask tanu for help with install
+
+library(usethis)
+library(devtools)
+library(ade4)
+library(adegenet)
+
+    
+    
+Wurm lab tutorial
+bcftools query Soc_Sol_filter_3.vcf -f '%CHROM\t%POS[\t%GT]\n' > Soc_Sol_matrix_may19.txt
+  # get sample names
+bcftools query -l Soc_Sol_filter_3.vcf > Soc_Sol_names.txt
+
+
+# input the SNP data and the sample names
+snp_matrix <- read.table("Soc_Sol_matrix_may19.txt") 
+sample_names <- read.table("Soc_Sol_names.txt") 
+sample_names <- sample_names$V1
+  
+# Keep the position of the loci
+loci <- snp_matrix[,1:2] 
+colnames(loci) <- c("scaffold", "position")
+
+# Turn the matrix on its side (rows = individuals, columns = loci)
+snp_matrix <- snp_matrix[,3:ncol(snp_matrix)] 
+snp_matrix <- t(snp_matrix)
+
+    # add sample names
+sample_names <- gsub("\\.bam","", sample_names) 
+row.names(snp_matrix) <- sample_names
+
+# reorder the rows by population
+soc <- sample_names[grep("cSoc", sample_names)] 
+sol <- sample_names[grep("cSol", sample_names)]
+snp_matrix <- snp_matrix[c(soc,sol),]
+
+
+ 
+library(adegenet)
+snp <- new("genlight", snp_matrix,
+chromosome=loci$scaffold, position=loci$position, pop=as.factor(c(rep("soc",7), rep("sol",7))))
+    
+#test
+snp
+snp@ind.names
+snp@gen
+
+#issue with this method
+
+--------------------------------------------
+https://grunwaldlab.github.io/Population_Genetics_in_R/analysis_of_genome.html#converting-vcf-data-to-a-genlight-object
+library(vcfR)
+vcf <- read.vcfR("Soc_Sol_filter_3.vcf.gz")
+vcf
+        ***** Object of Class vcfR *****
+        20 samples
+        15637 CHROMs
+        1,000,319 variants
+        Object size: 444 Mb
+        0 percent missing data
+x <- vcfR2genlight(vcf)
+
+    Warning message:
+    In vcfR2genlight(vcf) : Found 6305 loci with more than two alleles.
+        Objects of class genlight only support loci with two alleles.
+            6305 loci will be omitted from the genlight object.
+x
+ /// GENLIGHT OBJECT /////////
+
+ // 20 genotypes,  994,014 binary SNPs, size: 110.5 Mb
+ 3568156 (17.95 %) missing data
+
+ // Basic content
+   @gen: list of 20 SNPbin
+
+ // Optional content
+   @ind.names:  20 individual labels
+   @loc.names:  994014 locus labels
+   @chromosome: factor storing chromosomes of the SNPs
+   @position: integer storing positions of the SNPs
+   @other: a list containing: elements without names 
+
+#check random loci to see if coded correctly '0/1' then '1'
+gt <- extract.gt(vcf, element="GT")
+gt[c(2,6,18), 1:3]
+t(as.matrix(x))[c(1,5,17), 1:3]
+
+
+transp <- t(as.matrix(x))
+transp 
+
+
+       
+       
+library(usethis)
+library(devtools)
+library(ade4)
+library(adegenet)
+       
+pop(x) <- as.factor(c("cSoc_01", "cSoc_02", "cSoc_03", "cSoc_04", "cSoc_05", "cSoc_06", "cSoc_07", "cSoc_08", "cSoc_09", "cSoc_10", "cSol_01", "cSol_02", "cSol_03", "cSol_04", "cSol_05", "cSol_06", "cSol_07", "cSol_08", "cSol_09", "cSol_10"))
+popNames(x)
+ploidy(x) <- 2
+       
+       
+library(poppr)
+library(vcfR)
+
+vcf <- read.vcfR("Soc_Sol_filter_3.vcf.gz")
+vcf
+my_genind <- vcfR2genind(vcf)
+is.genind(my_genind)
+[1] TRUE
+> my_genind
+/// GENIND OBJECT /////////
+
+ // 20 individuals; 1,000,319 loci; 2,006,966 alleles; size: 760.8 Mb
+
+ // Basic content
+   @tab:  20 x 2006966 matrix of allele counts
+   @loc.n.all: number of alleles per locus (range: 2-4)
+   @loc.fac: locus factor for the 2006966 columns of @tab
+   @all.names: list of allele names for each locus
+   @ploidy: ploidy of each individual  (range: 2-2)
+   @type:  codom
+   @call: adegenet::df2genind(X = t(x), sep = sep)
+
+ // Optional content
+   - empty -
+       
+head(indNames(my_genind),10)
+       
+       
+       data(my_genind)
+sum(is.na(my_genind$tab))
+       
+       -------may 20---------
+       
+library(usethis)
+library(devtools)
+library(ade4)
+library(adegenet)
+library(poppr)
+library(vcfR)
+vcf <- read.vcfR("Soc_Sol_filter_3.vcf.gz")
+my_genind <- vcfR2genind(vcf)
+my_genind
+
+    #add in population information to the strata slot - make a dataframe, add into strata, call one column and add it in as pop information 
+sample_name <- c("cSoc_01", "cSoc_02", "cSoc_03", "cSoc_04", "cSoc_05", "cSoc_06", "cSoc_07", "cSoc_08", "cSoc_09", "cSoc_10", "cSol_01", "cSol_02", "cSol_03", "cSol_04", "cSol_05", "cSol_06", "cSol_07", "cSol_08", "cSol_09", "cSol_10")
+pops_list <- c("soc", "soc", "soc", "soc","soc", "soc","soc", "soc", "soc", "soc", "sol", "sol", "sol", "sol", "sol", "sol","sol", "sol", "sol", "sol")
+df <- data.frame(sample_name, pops_list)  
+df
+
+strata(my_genind) <- df
+    # set the population to the column called "pops_list" in the data frame
+setPop(my_genind) <- ~pops_list 
+
+        5.2 summaries 
+
+        Both genind and genpop objects have a summary providing basic information about data. Informations are both printed and invisibly returned as a list.
+       
+        toto <- summary(my_genind) #took too long? 
+        names(toto)
+
+
+        par(mfrow=c(2,2))
+        plot(toto$n.by.pop, toto$pop.n.all, xlab="Colonies sample size",
+             ylab="Number of alleles",main="Alleles numbers and sample sizes",
+             type="n")
+        text(toto$n.by.pop,toto$pop.n.all,lab=names(toto$n.by.pop))
+        barplot(toto$loc.n.all, ylab="Number of alleles",
+                main="Number of alleles per locus")
+        barplot(toto$Hexp-toto$Hobs, main="Heterozygosity: expected-observed",
+                ylab="Hexp - Hobs")
+        barplot(toto$n.by.pop, main="Sample sizes per population",
+                ylab="Number of genotypes",las=3)
+       
+       5.3 Testing for Hardy-Weinberg equilibrium
+        library(pegas)
+        my_genind.hwt <- hw.test(my_genind, B=0)
+        my_genind.hwt
+       
+5.4 Measuring and testing population structure (a.k.a F statistics)
+                library("hierfstat")
+                my_fstat <- fstat(my_genind) #did not work
+                           #write.csv(my_fstat, "soc_sol_fst_may22.csv")
+                write.fstat(my_fstat,fname="genotypes.dat")
+
+       This table provides the three F statistics Fst (pop/total), Fit (Ind/total), and Fis (ind/pop). These are overall measures which take into account all genotypes and all loci.
+           
+           For more detail, pegas provides estimates by locus:
+
+                library(pegas)
+                Fst(as.loci(my_genind))
+
+                > write.csv(,'soc_sol_fst_loci_may22.csv')
+                        Are these values significant? This question can be addressed using the G-statistic test [3]; it is implemented for genind objects and produces a randtest object (package ade4).
+
+                Gtest <- gstat.randtest(my_genind,nsim=99)
+                Gtest
+
+                       vcfR2genlight (use this for wurm lab tutorial, from "analysis of genome data")
+----------may 26 Fst--------- screen fst                  
+install.packages("fst")
+
+my_genpop <- genind2genpop(my_genind, pop = my_genind@pop, process.other = TRUE)
+my_genpop
+summary(my_genpop)
+
+Fst(my_genpop, outputFile = "soc_sol_fst_may26.txt.DIV")
+                    
+                    
+                    
+                    
+---------may 26 PCA --------screen newR
+(load everything as in the other screen- genind)
+                    
+6.2 adegenet tutorial
+
+sum(is.na(my_genind$tab))
+            #There are 7214876 missing data, which will be replaced by tab:
+X <- tab(my_genind, freq = TRUE, NA.method = "mean")
+class(X)
+dim(X)
+                    > class(X)
+                    [1] "matrix"
+                    > dim(X)
+                    [1]      20 2006966
+X[1:5,1:5]
+            #The analysis can now be performed. We disable the scaling in dudi.pca, as all ’variables’ (alleles) are vary on a common scale. Note: in practice, retained axes can be chosen interactively by removing the arguments scannf=FALSE,nf=3.
+pca1 <- dudi.pca(X, scale = FALSE, scannf = FALSE, nf = 3)
+#x11 not working because running multiple R sessions, save to pdf
+pdf("pca_may26.pdf")
+barplot(pca1$eig[1:50], main = "PCA eigenvalues", col = heat.colors(50))
+dev.off()
+
+pca1
+
+> pca1
+Duality diagramm
+class: pca dudi
+$call: dudi.pca(df = X, scale = FALSE, scannf = FALSE, nf = 3)
+
+$nf: 3 axis-components saved
+$rank: 19
+eigen values: 26910 15220 5146 5027 4934 ...
+  vector length  mode    content       
+1 $cw    2006966 numeric column weights
+2 $lw    20      numeric row weights   
+3 $eig   19      numeric eigen values  
+
+  data.frame nrow    ncol    content             
+1 $tab       20      2006966 modified array      
+2 $li        20      3       row coordinates     
+3 $l1        20      3       row normed scores   
+4 $co        2006966 3       column coordinates  
+5 $c1        2006966 3       column normed scores
+other elements: cent norm 
+
+
+            The output object pca1 is a list containing various information; of particular interest are: • $eig: the eigenvalues of the analysis, indicating the amount of variance represented by
+            each principal component (PC).
+            • $li: the principal components of the analysis; these are the synthetic variables summarizing the genetic diversity, usually visualized using scatterplots.
+            • $c1: the allele loadings, used to compute linear combinations forming the PCs; squared, they represent the contribution to each PCs.
+
+                #too much info this way
+                pdf("pca_may26_2.pdf")
+                scatter(pca1)
+                dev.off()
+
+                
+#replaced with this
+
+pdf("pca_may26_2.pdf")              
+pca2_graph <- s.class(pca1$li, fac=pop(my_genind), col=funky(15))
+dev.off()
+
+                
+                Ellipses indicate the distribution of the individuals from different groups. We can customize this graphic a little, by removing ellipse axes, adding a screeplot of the first 50 eigenvalues in inset, and making colors transparent to better assess overlapping points:
+
+s.class(pca1$li, fac=pop(my_genind),
+        col=transp(funky(15),.6),
+        axesel=FALSE, cstar=0, cpoint=3)
+add.scatter.eig(pca1$eig[1:50],3,1,2, ratio=.3) #issue with ylim
+
+
+Principal Coordinates Analysis (PCoA), also known as Metric Multidimensional Scaling (MDS), is the second most common multivariate analysis in population genetics. This method seeks the best approximation in reduced space of a matrix of Euclidean distances. Its principal components optimize the representation of the squared pairwise distances between individuals. This method is implemented in ade4 by dudi.pco. After scaling the relative allele frequencies of the microbov dataset, we perform this analysis:
+
+
+in terminal : 
+sudo -i R
+install.packages('devtools')
+    
+devtools::install_github('kkeenan02/diveRsity')
+library(diveRsity)
+
+save(my_genpop, file="my_genpop.txt")
+
+    my_genpop[is.na(my_genpop)] <- ""
+
+    diffCalc(infile = "my_genpop", outfile = "my_genpop_fst", fst = TRUE, pairwise = TRUE, bs_locus = TRUE, bs_pairwise = TRUE, boots = NULL, ci_type = "individuals", alpha = 0.05, para = FALSE)
+
+    ci_type: A character string indicating whether bootstrapping should be carried out over individuals within samples (􏰂􏰂individuals''.), or across loci (􏰂􏰂loci'').
+    
+    
+    
+writeGenPop(my_genind, "my_genind_as_genpop.gen", comment="genind converted to genpop format and saved for diffCalc")
+    
+    #gi	- A genind object with defined strata and population. See setPop. If a list, each list element will be written as a population. It is assumed that loci for all genind elements in a list are identical.
+    #file.name- A character string defining file name. You will have to specify the extension as well.
+    #comment	- A character string with a desired comment that will be prepended to the beginning of the file.
+    
+
+diffCalc(infile = my_genpop, outfile = "my_genpop_fst", fst = TRUE, pairwise = FALSE, bs_locus = TRUE, bs_pairwise = TRUE, boots = NULL, ci_type = "individuals", alpha = 0.05, para = FALSE)
+
+
+
+--------june 2--------
+#try converting to genpop again and make sure population information is there, then try diffCalc 
+my_genpop <- genind2genpop(my_genind, pop = my_genind@pop, process.other = TRUE)
+
+write.genepop(my_genpop, file = "my_genpop.gen", digits = 2L, description = "june 2 write to genpop")
+
+
+
+'CHROM', 'POS',	'ID',	REF	ALT	QUAL	FILTER	INFO	FORMAT	cSoc_01	cSoc_02	cSoc_03	cSoc_04	cSoc_05	cSoc_06	cSoc_07	cSoc_08	cSoc_09	cSoc_10	cSol_01	cSol_02	cSol_03	cSol_04	cSol_05	cSol_06	cSol_07	cSol_08	cSol_09	cSol_10

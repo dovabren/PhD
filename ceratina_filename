@@ -1,0 +1,48 @@
+Feb 25, 2020
+#run through pipeline without --knownSites first, then make SNP and INDEL file with all overlapping sites and use in filtering later 
+HI.5035.005.IDT_i7_42---IDT_i5_42.cSoc_01
+HI.5035.005.IDT_i7_54---IDT_i5_54.cSoc_02
+HI.5035.005.IDT_i7_66---IDT_i5_66.cSoc_03
+HI.5035.005.IDT_i7_78---IDT_i5_78.cSoc_04
+HI.5035.005.IDT_i7_90--IDT_i5_90.cSoc_05  
+HI.5035.005.IDT_i7_7---IDT_i5_7.cSoc_06
+HI.5035.006.IDT_i7_19--IDT_i5_19.cSoc_07
+HI.5035.006.IDT_i7_31---IDT_i5_31.cSoc_08
+HI.5035.006.IDT_i7_43---IDT_i5_43.cSoc_09
+HI.5035.006.IDT_i7_55--IDT_i5_55.cSoc_10
+HI.5035.006.IDT_i7_67--IDT_i5_67.cSol_01
+HI.5035.006.IDT_i7_79--IDT_i5_79.cSol_02
+HI.5035.007.IDT_i7_91---IDT_i5_91.cSol_03
+HI.5035.007.IDT_i7_8---IDT_i5_8.cSol_04
+HI.5035.007.IDT_i7_20-IDT_i5_20.cSol_05
+HI.5035.007.IDT_i7_32---IDT_i5_32.cSol_06 
+HI.5035.007.IDT_i7_44--IDT_i5_44.cSol_07
+HI.5035.007.IDT_i7_56---IDT_i5_56.cSol_08
+HI.5035.008.IDT_i7_68--IDT_i5_68.cSol_09
+HI.5035.008.IDT_i7_80---IDT_i5_80.cSol_10
+
+
+
+#error with BaseRecalibrator- need to make different reference genome with .fai
+
+samtools faidx ASM165200v1_rename.fa
+
+-- makes .fai file
+
+
+## feb 26
+
+filename='ceratina_redo12.txt'
+cat $filename | while read -r file
+do
+sid="$(cut -d'.' -f5 <<<$file)"
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T BaseRecalibrator -nct 36 -R /data3/ASM165200v1_rename.fa -I $sid"_marked_duplicates.bam" -o $sid".recal.table"
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T PrintReads -R /data3/ASM165200v1_rename.fa -nct 36 -I $sid"_marked_duplicates.bam" -BQSR $sid".recal.table" -o $sid"_BQSR.bam"
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T CallableLoci -R /data3/ASM165200v1_rename.fa -I $sid"_BQSR.bam" -summary $sid"_sum.txt" -o $sid"_callable.bed"
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T HaplotypeCaller -nct 20 -R /data3/ASM165200v1_rename.fa -I $sid"_BQSR.bam" --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 --emitRefConfidence GVCF -ploidy 2 -o $sid"_raw_variants.g.vcf"
+
+done

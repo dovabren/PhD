@@ -1,0 +1,153 @@
+analyzing Fst --- june 20
+
+
+
+
+vcftools --vcf Soc_Sol_filter_3.vcf --weir-fst-pop population_1.txt --weir-fst-pop population_2.txt --out pop1_vs_pop2
+
+
+#output: pop1_vs_pop2.weir.fst pop1_vs_pop2.log
+
+
+
+#add Fst column in python, save vcf 
+    load vcf, load .fst, add one column of fst to vcf, save as new vcf --> 
+    new dataframe with no negative Fst (how many are removed- (total SNP) 1000319- (remaining with positive Fst)375959 = 624360 removed)
+    
+#then save header from original vcf and cat to new python-generated vcf
+
+cat Soc_Sol_filter_3.vcf | grep '^##' | sed 's/=/\,/g' > header.txt
+
+cat header.txt Soc_Sol_Fst_jun3.vcf > Soc_Sol_Fst_jun3_header.vcf
+
+
+cat header.txt Soc_Sol_highest_Fst_jun5.vcf > Soc_Sol_highest_Fst_jun5_header.vcf
+#now remove anything with a negative Fst (python, add header?)
+#awk 'FNR==NR{a[$1]=$2 FS $3;next}{ print $0, a[$1]}' file2 file1
+
+
+
+#snpeff 
+
+
+- see other papers and how they analyze fst -- how many is typical to look at? only those with highest Fst or a range? top 1%? 
+
+
+jun 5-----
+
+chose top 15% (over 0.89 Fst)
+
+ASM165200v1
+
+
+java -Xmx4g -jar snpEff/snpEff.jar -v ASM165200v1 Soc_Sol_highest_Fst_jun5_header.vcf > Soc_Sol_highest_Fst_jun5_header.ann.vcf
+
+
+java -Xmx4g -jar /data3/dova_nanuq_raw_data/snpEff/snpEff.jar -c /data3/dova_nanuq_raw_data/snpEff/snpEff.config -v ASM165200v1 Soc_Sol_highest_Fst_jun5_header.vcf > Soc_Sol_highest_Fst_jun5_header.ann.vcf --geneID
+
+#all through snpeff so have the refseq names 
+java -Xmx4g -jar /data3/dova_nanuq_raw_data/snpEff/snpEff.jar -c /data3/dova_nanuq_raw_data/snpEff/snpEff.config -v ASM165200v1 Soc_Sol_filter_3.vcf > Soc_Sol_filter_3.ann.vcf
+
+java -Xmx4g -jar snpEff/snpEff.jar ann -v ASM165200v1 Soc_Sol_highest_Fst_jun5_header.vcf > Soc_Sol_highest_Fst_jun5_header.ann.vcf --geneID
+
+
+---------jun 12 2020---------
+#annotate genes with geneID
+java -Xmx4g -jar snpEff/snpEff.jar -geneId ASM165200v1 Soc_Sol_highest_Fst_jun5_header.vcf > Soc_Sol_highest_Fst_jun5_header.ann.vcf
+
+#extract gene ID list 
+java -jar snpEff/SnpSift.jar extractFields Soc_Sol_highest_Fst_jun5_header.ann.vcf >Soc_Sol_highest_Fst_jun5_header_geneID.ann.vcf "ANN[*].GENE:"
+
+java -jar snpEff/SnpSift.jar extractFields Soc_Sol_highest_Fst_jun5_header.ann.vcf > Soc_Sol_highest_Fst_jun5_header_geneID.ann.vcf  "ANN[*].GENE:" | awk -F"|" '{print $4}'
+
+#june 14
+#redo genome build with annotated genome (from sandra), now called sequence.fa
+java -jar -Xmx4G snpEff.jar build -gff3 -v ASM165200v1
+
+*make sure to add the genome to the snpEff/data/genomes folder 
+
+#try to run snpEff on whole file 
+java -Xmx4g -jar /data3/dova_nanuq_raw_data/snpEff/snpEff.jar -c /data3/dova_nanuq_raw_data/snpEff/snpEff.config -v ASM165200v1 Soc_Sol_filter_3.vcf > Soc_Sol_filter_3.ann.vcf
+
+#wrong names used above to compare to ccalc annotations and GO, need to make a new gff with the ccalc annotations 
+
+
+
+
+
+--------manhattan plot in R-- july 6,2020
+install.packages("qqman")
+library(qqman)
+fst<-read.table("pop1_vs_pop2.weir.fst", header=TRUE)
+
+#fstsubset<-fst[complete.cases(fst),]
+#SNP<-cbind(1:(nrow(fstsubset)-1))
+mydf<-data.frame(fst)
+
+manhattan(mydf,chr="CHROM",bp="POS",p="WEIR_AND_COCKERHAM_FST", logp=FALSE,ylab="Weir and Cockerham Fst")
+
+
+
+
+# read in the file
+library(tidyverse)
+fst <- read_tsv("pop1_vs_pop2.weir.fst")
+
+# capdown the headers
+names(fst) <- tolower(fst)
+names(fst)[grep("fst")] <- "fst"
+
+
+
+
+-------------------sept 16--------------
+#get snpeff for final file used for Fst and look at where high fst snps are located (within genes, near genes etc)
+
+
+vcftools --vcf Soc_Sol_filter_3.vcf --weir-fst-pop population_1.txt --weir-fst-pop population_2.txt --out pop1_vs_pop2
+
+SNPEff---
+java -Xmx4g -jar /data3/dova_nanuq_raw_data/snpEff/snpEff.jar -c /data3/dova_nanuq_raw_data/snpEff/snpEff.config -v ASM165200v1 Soc_Sol_filter_3.vcf > Soc_Sol_filter_3.ann.vcf
+
+
+# bash - make new files of just these scaffolds
+NW_017130860.1, NW_017131059.1, NW_017131077.1
+
+awk '$1 ~ /NW_017131496.1/' pop1_vs_pop2_025.weir.fst > NW_017131496.1_fst.txt
+awk '$1 ~ /NW_017172225.1/' pop1_vs_pop2_025.weir.fst > NW_017172225.1_fst.txt
+awk '$1 ~ /NW_017173654.1/' pop1_vs_pop2_025.weir.fst > NW_017173654.1_fst.txt
+
+
+
+NW_017131496.1
+NW_017172225.1
+NW_017173654.1
+-----R------
+---sept 18---
+
+library(qqman)
+fst<-read.table('NW_017173654.1_fst.txt', header=TRUE)
+
+fstsubset<-fst[complete.cases(fst),]
+
+SNP<-c(1:(nrow(fstsubset)))
+
+mydf<-data.frame(SNP,fstsubset)
+
+mylabs <- unique(mydf$CHR)
+snpofinterest = mydf[mydf$Fst >= 0.5,]
+snpofinterest 
+
+
+mydf$CHR <- as.numeric(factor(mydf$CHR, levels = mylabs))
+
+manhattan(mydf, bp="POS",p="Fst",snp="SNP",logp=FALSE,ylab='Weir and Cockerham Fst',chrlabs = "CHROM", highlight = snpofinterest$SNP)
+
+head(mydf)
+
+
+--------------------Dec 4
+
+sliding window Fst
+
+vcftools --vcf Soc_Sol_filter_3_025.vcf --weir-fst-pop population_1.txt --weir-fst-pop population_2.txt --fst-window-size 1000 --fst-window-step 1000 --out pop1_pop2_sliding.txt

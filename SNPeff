@@ -1,0 +1,56 @@
+#find the genome
+java -jar snpEff/snpEff.jar databases | grep -i mellifera
+
+
+java -jar snpEff/snpEff.jar build -gtf22 -v Amel_HAv3.1
+
+
+#GFF and reference genome locations 
+/data3/dova_nanuq_raw_data/snpEff/data/Amel_HAv3.1/GCF_003254395.2_Amel_HAv3.1_genomic.gff 
+
+/data3/dova_nanuq_raw_data/snpEff/data/Amel_HAv3.1/HAV3.1_renamed.fa
+
+vi snpEff.config
+amelHAv3.genome: apis_mellifera_new
+
+java -jar /data3/dova_nanuq_raw_data/snpEff/snpEff.jar build -gff3 -v amelHAv3
+
+java -Xmx4g -jar /data3/dova_nanuq_raw_data/snpEff/snpEff.jar -c /data3/dova_nanuq_raw_data/snpEff/snpEff.config -v amelHAv3 A_drm_filter6.vcf > A_drm_filter6.ann.vcf
+
+-------may 25, 2020--------
+snpEff.config
+
+# Add lines:
+#		GRCh37.70.genome : Homo_sapiens
+#		GRCh37.70.reference : ftp://ftp.ensembl.org/pub/release-70/gtf/
+
+ASM165200v1.genome: ceratina_calcarata
+ASM165200v1.fna.reference: https://ftp.ncbi.nlm.nih.gov/genomes/all/annotation_releases/156304/101/GCF_001652005.1_ASM165200v1/GCF_001652005.1_ASM165200v1_genomic.gtf.gz
+
+
+java -jar -Xmx4G snpEff/snpEff.jar build -gff3 -v ASM165200v1
+
+java -jar -Xmx4G snpEff/snpEff.jar build -gtf22 -v ASM165200v1
+
+java -Xmx4g -jar snpEff.jar download -c snpEff.config -v ASM165200v1
+
+java -jar snpEff/snpEff.jar build -genbank -v ASM165200v1 
+
+java -jar snpEff.jar dump ASM165200v1 | less
+
+
+#issue was with extra info attached to each scaffold name- removed using the command:
+sudo sed '/^>/ s/ .*//' sequence1.fa  > sequence1.fa
+
+
+grep -o '^\S*' sequence1.fa  > sequence1_fixed.fa
+
+sed 's/-.*//' sequence1_fixed.fa > sequence2_fixed.fa
+
+sed 's/-.*//' ASM165200v1_no_tags.fa > ASM165200v1_correct_geneID.fa
+
+
+
+
+
+

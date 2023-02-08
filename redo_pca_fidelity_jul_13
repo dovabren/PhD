@@ -1,0 +1,71 @@
+---------may 13  http://pages.stat.wisc.edu/~miaoyan/population_miaoyan.html
+#log in with ssh -Y and open x11() at the begining of the session 
+library(SNPRelate)
+library(gdsfmt)  
+
+#Count number of individuals in the study
+FAM<- read.table(file="/data3/dova_nanuq_raw_data/converted_ceratina.fam",sep=" ", header=FALSE,na="NA")
+head(FAM)
+dim(FAM)
+unique(FAM$V1) #returns cSoc and cSol - so it is recognizing the two populations
+#make a .ind file with all the individuals in the sample set 
+ceratina_sample.ind
+ID      sex     population
+cSoc_01 F       social
+cSoc_02 F       social
+cSoc_03 F       social
+cSoc_04 F       social
+cSoc_05 F       social
+cSoc_06 F       social
+cSoc_07 F       social
+cSoc_08 F       social
+cSoc_09 F       social
+cSoc_10 F       social
+cSol_01 F       solitary
+cSol_02 F       solitary
+cSol_03 F       solitary
+cSol_04 F       solitary
+cSol_05 F       solitary
+cSol_06 F       solitary
+cSol_07 F       solitary
+cSol_08 F       solitary
+cSol_09 F       solitary
+cSol_10 F       solitary
+
+
+
+
+POPINFO=read.table(file="ceratina_sample.ind",header=TRUE)
+table(POPINFO$population)
+
+bedfile <- "/data3/dova_nanuq_raw_data/converted_ceratina.bed"
+famfile <- "/data3/dova_nanuq_raw_data/converted_ceratina.fam"
+bimfile <- "/data3/dova_nanuq_raw_data/converted_ceratina.bim"
+
+snpgdsBED2GDS(bedfile, famfile, bimfile, "soc_sol_pca_may13.gds", cvt.chr=("char"))
+
+
+
+genofile <- snpgdsOpen("soc_sol_pca_may13.gds")
+head(genofile)
+    
+head(read.gdsn(index.gdsn(genofile, "sample.id")))    
+head(read.gdsn(index.gdsn(genofile, "snp.id")))
+g <- snpgdsGetGeno(genofile, snp.id="1")
+hist(g)
+    
+#1. Perform a PCA for the sample using all of the SNPs. Make a scatterplot of the first two principal components (PCs) with each point colored according to population membership.
+
+pca <- snpgdsPCA(genofile, autosome.only=FALSE) #non-standard chromosomes 
+sample.id <- read.gdsn(index.gdsn(genofile, "sample.id"))
+population=POPINFO$population
+tab <- data.frame(sample.id = pca$sample.id, pop = factor(population)[match(pca$sample.id, sample.id)], EV1 = pca$eigenvect[,1], EV2 = pca$eigenvect[,2], stringsAsFactors = FALSE)    
+
+head(tab)
+plot(tab$EV2, tab$EV1, col=as.integer(tab$pop), xlab="eigenvector 2", ylab="eigenvector 1", main="PCA using all SNPs")
+legend("topright", legend=levels(tab$pop), pch="o", col=1:(nlevels(tab$pop)))
+
+
+
+#imput missing genotypes- 15 min
+java -Xmx24g -jar beagle.18May20.d20.jar gt=Soc_Sol_filter_3_025_zip.vcf.gz nthreads=8 iterations=30 impute=true out=Soc_Sol_filter_3_025_imputed_ref

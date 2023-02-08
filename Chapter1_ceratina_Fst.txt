@@ -1,0 +1,395 @@
+filename='ceratina_filename.txt'
+cat $filename | while read -r file
+do
+sid="$(cut -d'.' -f5 <<<$file)"
+
+java -jar /data3/Trimmomatic-0.36/trimmomatic-0.36.jar PE -threads 36 -phred33 $file"_R1.fastq.gz" $file"_R2.fastq.gz" $sid"_paired_R1.fastq.gz" $sid"_unpaired_R1.fastq.gz" $sid"_paired_R2.fastq.gz" $sid"_unpaired_R2.fastq.gz" ILLUMINACLIP:/usr/local/scripts/ADAPTER.fa:2:30:10 LEADING:20 TRAILING:20 SLIDINGWINDOW:20:25 MINLEN:35
+
+fastqc -t 36 $sid*paired*
+
+ngm -r /data3/ASM165200v1_rename.fa -p -1 $sid"_paired_R1.fastq.gz" -2 $sid"_paired_R2.fastq.gz" -t 36 -b --rg-id $sid --rg-sm $sid --rg-lb PE --rg-pl Illumina -o $sid"_ngm_aligned.bam"
+
+samtools sort $sid"_ngm_aligned.bam" -o $sid"_ngm_aligned_sorted.bam" 
+
+samtools index $sid"_ngm_aligned_sorted.bam"
+
+samtools depth $sid"_ngm_aligned_sorted.bam" > $sid"_depth.txt"
+
+/data3/dova_nanuq_raw_data/qualimap_v2.2.1/qualimap bamqc -bam $sid"_ngm_aligned_sorted.bam" -outfile $sid"_qualimap.pdf" --java-mem-size=4G 
+
+java -jar /usr/local/src/picard-tools-2.1.0/picard.jar MarkDuplicates I=$sid"_ngm_aligned_sorted.bam" O=$sid"_marked_duplicates.bam" M=$sid"_marked_dup_metrics.txt" VALIDATION_STRINGENCY=SILENT MAX_FILE_HANDLES_FOR_READ_ENDS_MAP=1000
+
+samtools index $sid"_marked_duplicates.bam"
+
+#java -jar /usr/local/src/GenomeAnalysisTK.jar -T BaseRecalibrator -nct 36 -R /data3/ASM165200v1_rename.fa -I $sid"_marked_duplicates.bam" --knownSites /data2/Training_set/INDEL_TRAINING_lifted_over.vcf --knownSites /data2/Training_set/SNP_TRAINING_lifted_over.vcf -o $sid".recal.table"
+
+#java -jar /usr/local/src/GenomeAnalysisTK.jar -T PrintReads -R /data3/ASM165200v1_rename.fa -nct 36 -I $sid"_marked_duplicates.bam" -BQSR $sid".recal.table" -o $sid"_BQSR.bam"
+
+#java -jar /usr/local/src/GenomeAnalysisTK.jar -T CallableLoci -R /data3/ASM165200v1_rename.fa -I $sid"_BQSR.bam" -summary $sid"_sum.txt" -o $sid"_callable.bed"
+
+#java -jar /usr/local/src/GenomeAnalysisTK.jar -T HaplotypeCaller -nct 20 -R /data3/ASM165200v1_rename.fa -I $sid"_BQSR.bam" --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 --emitRefConfidence GVCF -ploidy 2 -o $sid"_raw_variants.g.vcf"
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T HaplotypeCaller -nct 20 -R /data3/ASM165200v1_rename.fa -I $sid"_marked_duplicates.bam" --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 --emitRefConfidence GVCF -ploidy 2 -o $sid"_raw_variants.g.vcf"
+
+done
+--------------------mar 22-----------------------------
+    #Mar22- run combine GVCF and genotypeGVCF on all samples, selectvariants for SNPs 
+    java -jar ./gatk-4.1.3.0/gatk-package-4.1.3.0-local.jar CombineGVCFs -R /data3/ASM165200v1_rename.fa --variant cSoc_01_raw_variants.g.vcf -O cSoc_01_combineGVCF.g.vcf
+
+    java -jar ./gatk-4.1.3.0/gatk-package-4.1.3.0-local.jar GenotypeGVCFs -R /data3/ASM165200v1_rename.fa --variant cSoc_01_combineGVCF.g.vcf -O cSoc_01_genotypeGVCF.g.vcf --allow-old-rms-mapping-quality-annotation-data
+
+    java -jar ./gatk-4.1.3.0/gatk-package-4.1.3.0-local.jar SelectVariants -R /data3/ASM165200v1_rename.fa -V cSoc_01_genotypeGVCF.g.vcf --select-type SNP -O cSoc_01_snp.vcf
+
+    #run combineGVCF on each then genotypeGVCF on each then selectvariant snp or indel on each then bedtools intersect in pairs then all together 
+
+
+#all filename saved in ceratina_raw_training_snp.txt
+cSoc_01
+cSoc_02
+cSoc_03
+cSoc_04
+cSoc_05
+cSoc_06
+cSoc_07
+cSoc_08
+cSoc_09
+cSoc_10
+cSol_01
+cSol_02
+cSol_03
+cSol_04
+cSol_05
+cSol_06
+cSol_07
+cSol_08
+cSol_09
+cSol_10
+
+#loop for finding SNPs in each file 
+
+filename='ceratina_raw_training_snp.txt'
+cat $filename | while read -r file
+do
+sid="$(cut -d'.' -f5 <<<$file)"
+
+java -jar ./gatk-4.1.3.0/gatk-package-4.1.3.0-local.jar CombineGVCFs -R /data3/ASM165200v1_rename.fa --variant $sid"_raw_variants.g.vcf" -O $sid"_combineGVCF.g.vcf" 
+
+java -jar ./gatk-4.1.3.0/gatk-package-4.1.3.0-local.jar GenotypeGVCFs -R /data3/ASM165200v1_rename.fa --variant $sid"_combineGVCF.g.vcf" -O $sid"_genotypeGVCF.g.vcf" --allow-old-rms-mapping-quality-annotation-data
+
+java -jar ./gatk-4.1.3.0/gatk-package-4.1.3.0-local.jar SelectVariants -R /data3/ASM165200v1_rename.fa -V $sid"_genotypeGVCF.g.vcf" --select-type SNP -O $sid"_snp.vcf"
+
+java -jar ./gatk-4.1.3.0/gatk-package-4.1.3.0-local.jar SelectVariants -R /data3/ASM165200v1_rename.fa -V $sid"_genotypeGVCF.g.vcf" --select-type INDEL -O $sid"_indel.vcf"
+
+done
+
+#bedtools intersect  or bcftools isec
+
+bedtools intersect -a cSoc_01_snp.vcf -b cSoc_02_snp.vcf cSoc_03_snp.vcf cSoc_04_snp.vcf  cSoc_05_snp.vcf cSoc_06_snp.vcf cSoc_07_snp.vcf cSoc_08_snp.vcf cSoc_09_snp.vcf cSoc_10_snp.vcf cSol_01_snp.vcf cSol_02_snp.vcf cSol_03_snp.vcf cSol_04_snp.vcf cSol_05_snp.vcf cSol_06_snp.vcf cSol_07_snp.vcf cSol_08_snp.vcf cSol_09_snp.vcf cSol_10_snp.vcf > ceratina_snp_overlap.vcf
+
+bedtools intersect -a cSoc_01_indel.vcf -b cSoc_02_indel.vcf cSoc_03_indel.vcf cSoc_04_indel.vcf cSoc_05_indel.vcf cSoc_06_indel.vcf cSoc_07_indel.vcf cSoc_08_indel.vcf cSoc_09_indel.vcf cSoc_10_indel.vcf cSol_01_indel.vcf cSol_02_indel.vcf cSol_03_indel.vcf cSol_04_indel.vcf cSol_05_indel.vcf cSol_06_indel.vcf cSol_07_indel.vcf cSol_08_indel.vcf cSol_09_indel.vcf cSol_10_indel.vcf > ceratina_indel_overlap.vcf
+
+
+-------------------mar 24-------------------
+#redo BQSR with new SNP and INDEL files 
+#test on one sample
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T BaseRecalibrator -nct 36 -R /data3/ASM165200v1_rename.fa -I cSoc_01_marked_duplicates.bam --knownSites ceratina_indel_overlap.vcf --knownSites ceratina_snp_overlap.vcf -o cSoc_01.recal.table
+
+
+#loop
+#java -jar /usr/local/src/GenomeAnalysisTK.jar -T BaseRecalibrator -nct 36 -R /data3/ASM165200v1_rename.fa -I $sid"_marked_duplicates.bam" --knownSites /data2/Training_set/INDEL_TRAINING_lifted_over.vcf --knownSites /data2/Training_set/SNP_TRAINING_lifted_over.vcf -o $sid".recal.table"
+
+#java -jar /usr/local/src/GenomeAnalysisTK.jar -T PrintReads -R /data3/ASM165200v1_rename.fa -nct 36 -I $sid"_marked_duplicates.bam" -BQSR $sid".recal.table" -o $sid"_BQSR.bam"
+
+#java -jar /usr/local/src/GenomeAnalysisTK.jar -T CallableLoci -R /data3/ASM165200v1_rename.fa -I $sid"_BQSR.bam" -summary $sid"_sum.txt" -o $sid"_callable.bed"
+
+#java -jar /usr/local/src/GenomeAnalysisTK.jar -T HaplotypeCaller -nct 20 -R /data3/ASM165200v1_rename.fa -I $sid"_BQSR.bam" --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 --emitRefConfidence GVCF -ploidy 2 -o $sid"_raw_variants.g.vcf"
+
+
+--------------------mar 29-------------------------
+#try different way to intersect
+#vcf tools and bcftools only work after bgzip and indexing - overwrite what was done- how to blanket overwrite? 
+#zip every file 
+
+bgzip cSoc_01_snp.vcf > cSoc_01_snp.vcf.gz
+bgzip cSoc_02_snp.vcf > cSoc_02_snp.vcf.gz
+bgzip cSoc_03_snp.vcf > cSoc_03_snp.vcf.gz
+bgzip cSoc_04_snp.vcf > cSoc_04_snp.vcf.gz
+bgzip cSoc_05_snp.vcf > cSoc_05_snp.vcf.gz
+bgzip cSoc_06_snp.vcf > cSoc_06_snp.vcf.gz
+bgzip cSoc_07_snp.vcf > cSoc_07_snp.vcf.gz
+bgzip cSoc_08_snp.vcf > cSoc_08_snp.vcf.gz
+bgzip cSoc_09_snp.vcf > cSoc_09_snp.vcf.gz
+bgzip cSoc_10_snp.vcf > cSoc_10_snp.vcf.gz
+bgzip cSol_01_snp.vcf > cSol_01_snp.vcf.gz
+bgzip cSol_02_snp.vcf > cSol_02_snp.vcf.gz
+bgzip cSol_03_snp.vcf > cSol_03_snp.vcf.gz
+bgzip cSol_04_snp.vcf > cSol_04_snp.vcf.gz
+bgzip cSol_05_snp.vcf > cSol_05_snp.vcf.gz
+bgzip cSol_06_snp.vcf > cSol_06_snp.vcf.gz
+bgzip cSol_07_snp.vcf > cSol_07_snp.vcf.gz
+bgzip cSol_08_snp.vcf > cSol_08_snp.vcf.gz
+bgzip cSol_09_snp.vcf > cSol_09_snp.vcf.gz
+bgzip cSol_10_snp.vcf > cSol_10_snp.vcf.gz
+
+bgzip cSoc_01_indel.vcf > cSoc_01_indel.vcf.gz
+bgzip cSoc_02_indel.vcf > cSoc_02_indel.vcf.gz
+bgzip cSoc_03_indel.vcf > cSoc_03_indel.vcf.gz
+bgzip cSoc_04_indel.vcf > cSoc_04_indel.vcf.gz
+bgzip cSoc_05_indel.vcf > cSoc_05_indel.vcf.gz
+bgzip cSoc_06_indel.vcf > cSoc_06_indel.vcf.gz
+bgzip cSoc_07_indel.vcf > cSoc_07_indel.vcf.gz
+bgzip cSoc_08_indel.vcf > cSoc_08_indel.vcf.gz
+bgzip cSoc_09_indel.vcf > cSoc_09_indel.vcf.gz
+bgzip cSoc_10_indel.vcf > cSoc_10_indel.vcf.gz
+bgzip cSol_01_indel.vcf > cSol_01_indel.vcf.gz
+bgzip cSol_02_indel.vcf > cSol_02_indel.vcf.gz
+bgzip cSol_03_indel.vcf > cSol_03_indel.vcf.gz
+bgzip cSol_04_indel.vcf > cSol_04_indel.vcf.gz
+bgzip cSol_05_indel.vcf > cSol_05_indel.vcf.gz
+bgzip cSol_06_indel.vcf > cSol_06_indel.vcf.gz
+bgzip cSol_07_indel.vcf > cSol_07_indel.vcf.gz
+bgzip cSol_08_indel.vcf > cSol_08_indel.vcf.gz
+bgzip cSol_09_indel.vcf > cSol_09_indel.vcf.gz
+bgzip cSol_10_indel.vcf > cSol_10_indel.vcf.gz
+
+bcftools index -f cSoc_01_snp.vcf.gz > cSoc_01_snp.vcf.gz.csi
+bcftools index -f cSoc_02_snp.vcf.gz > cSoc_02_snp.vcf.gz.csi
+bcftools index -f cSoc_03_snp.vcf.gz > cSoc_03_snp.vcf.gz.csi
+bcftools index -f cSoc_04_snp.vcf.gz > cSoc_04_snp.vcf.gz.csi
+bcftools index -f cSoc_05_snp.vcf.gz > cSoc_05_snp.vcf.gz.csi
+bcftools index -f cSoc_06_snp.vcf.gz > cSoc_06_snp.vcf.gz.csi
+bcftools index -f cSoc_07_snp.vcf.gz > cSoc_07_snp.vcf.gz.csi
+bcftools index -f cSoc_08_snp.vcf.gz > cSoc_08_snp.vcf.gz.csi
+bcftools index -f cSoc_09_snp.vcf.gz > cSoc_09_snp.vcf.gz.csi
+bcftools index -f cSoc_10_snp.vcf.gz > cSoc_10_snp.vcf.gz.csi
+bcftools index -f cSol_01_snp.vcf.gz > cSol_01_snp.vcf.gz.csi
+bcftools index -f cSol_02_snp.vcf.gz > cSol_02_snp.vcf.gz.csi
+bcftools index -f cSol_03_snp.vcf.gz > cSol_03_snp.vcf.gz.csi
+bcftools index -f cSol_04_snp.vcf.gz > cSol_04_snp.vcf.gz.csi
+bcftools index -f cSol_05_snp.vcf.gz > cSol_05_snp.vcf.gz.csi
+bcftools index -f cSol_06_snp.vcf.gz > cSol_06_snp.vcf.gz.csi
+bcftools index -f cSol_07_snp.vcf.gz > cSol_07_snp.vcf.gz.csi
+bcftools index -f cSol_08_snp.vcf.gz > cSol_08_snp.vcf.gz.csi
+bcftools index -f cSol_09_snp.vcf.gz > cSol_09_snp.vcf.gz.csi
+bcftools index -f cSol_10_snp.vcf.gz > cSol_10_snp.vcf.gz.csi
+
+bcftools index -f cSoc_01_indel.vcf.gz > cSoc_01_indel.vcf.gz.csi
+bcftools index -f cSoc_02_indel.vcf.gz > cSoc_02_indel.vcf.gz.csi
+bcftools index -f cSoc_03_indel.vcf.gz > cSoc_03_indel.vcf.gz.csi
+bcftools index -f cSoc_04_indel.vcf.gz > cSoc_04_indel.vcf.gz.csi
+bcftools index -f cSoc_05_indel.vcf.gz > cSoc_05_indel.vcf.gz.csi
+bcftools index -f cSoc_06_indel.vcf.gz > cSoc_06_indel.vcf.gz.csi
+bcftools index -f cSoc_07_indel.vcf.gz > cSoc_07_indel.vcf.gz.csi
+bcftools index -f cSoc_08_indel.vcf.gz > cSoc_08_indel.vcf.gz.csi
+bcftools index -f cSoc_09_indel.vcf.gz > cSoc_09_indel.vcf.gz.csi
+bcftools index -f cSoc_10_indel.vcf.gz > cSoc_10_indel.vcf.gz.csi
+bcftools index -f cSol_01_indel.vcf.gz > cSol_01_indel.vcf.gz.csi
+bcftools index -f cSol_02_indel.vcf.gz > cSol_02_indel.vcf.gz.csi
+bcftools index -f cSol_03_indel.vcf.gz > cSol_03_indel.vcf.gz.csi
+bcftools index -f cSol_04_indel.vcf.gz > cSol_04_indel.vcf.gz.csi
+bcftools index -f cSol_05_indel.vcf.gz > cSol_05_indel.vcf.gz.csi
+bcftools index -f cSol_06_indel.vcf.gz > cSol_06_indel.vcf.gz.csi
+bcftools index -f cSol_07_indel.vcf.gz > cSol_07_indel.vcf.gz.csi
+bcftools index -f cSol_08_indel.vcf.gz > cSol_08_indel.vcf.gz.csi
+bcftools index -f cSol_09_indel.vcf.gz > cSol_09_indel.vcf.gz.csi
+bcftools index -f cSol_10_indel.vcf.gz > cSol_10_indel.vcf.gz.csi
+
+#see  bcftools documentation - saves in a directory 
+bcftools isec -p dir_snp -n=20 cSoc_01_snp.vcf.gz cSoc_02_snp.vcf.gz cSoc_03_snp.vcf.gz cSoc_04_snp.vcf.gz cSoc_05_snp.vcf.gz cSoc_06_snp.vcf.gz cSoc_07_snp.vcf.gz cSoc_08_snp.vcf.gz cSoc_09_snp.vcf.gz cSoc_10_snp.vcf.gz cSol_01_snp.vcf.gz cSol_02_snp.vcf.gz cSol_03_snp.vcf.gz cSol_04_snp.vcf.gz cSol_05_snp.vcf.gz cSol_06_snp.vcf.gz cSol_07_snp.vcf.gz cSol_08_snp.vcf.gz cSol_09_snp.vcf.gz cSol_10_snp.vcf.gz
+
+bcftools isec -p dir_indel -n=20 cSoc_01_indel.vcf.gz cSoc_02_indel.vcf.gz cSoc_03_indel.vcf.gz cSoc_04_indel.vcf.gz cSoc_05_indel.vcf.gz cSoc_06_indel.vcf.gz cSoc_07_indel.vcf.gz cSoc_08_indel.vcf.gz cSoc_09_indel.vcf.gz cSoc_10_indel.vcf.gz cSol_01_indel.vcf.gz cSol_02_indel.vcf.gz cSol_03_indel.vcf.gz cSol_04_indel.vcf.gz cSol_05_indel.vcf.gz cSol_06_indel.vcf.gz cSol_07_indel.vcf.gz cSol_08_indel.vcf.gz cSol_09_indel.vcf.gz cSol_10_indel.vcf.gz
+
+#Try to run isec:
+#bcftools isec isec.a.vcf.gz isec.b.vcf.gz -p dir
+#In your dir, you shouldsee README and three output files. README tells you a little about these three files. Let's look at outputs for more details:
+#So, I got 0000.vcf, 0001.vcf and 0002.vcf files:
+#0000.vcf file:
+#So, if you look at output files, you'd see that the first file contains variants that unique for the first input vcf file (isec.a.vcf). The second output contains variants unique for the second input file (isec.b.vcf). The third file contains variants intersected for both first and second input files (isec.a.vcf and isec.b.vcf).
+
+
+#java -jar /usr/local/src/GenomeAnalysisTK.jar -T ValidateVariants -R /data3/ASM165200v1_rename.fa -V ceratina_indel_overlap.vcf
+
+rename and move the overlapping variants, use as training data 
+
+---------------------mar 30-----------------
+dova@bombus:/data3/dova_nanuq_raw_data/dir_indel$ cp /data3/dova_nanuq_raw_data/dir_snp/0000.vcf /data3/dova_nanuq_raw_data/
+dova@bombus:/data3/dova_nanuq_raw_data/dir_indel$ cp /data3/dova_nanuq_raw_data/dir_indel/0000.vcf /data3/dova_nanuq_raw_data/
+dova@bombus:/data3/dova_nanuq_raw_data/dir_indel$ cd ..
+dova@bombus:/data3/dova_nanuq_raw_data$ ls 0000.vcf 
+0000.vcf
+dova@bombus:/data3/dova_nanuq_raw_data$ mv 0000.vcf CERATINA_INDEL_TRAINING.vcf
+
+
+#run through once and look at vcf on cSoc_01, then loop on rest if it works 
+dova@bombus:/data3/dova_nanuq_raw_data$ java -jar /usr/local/src/GenomeAnalysisTK.jar -T BaseRecalibrator -nct 36 -R /data3/ASM165200v1_rename.fa -I cSoc_01_marked_duplicates.bam --knownSites CERATINA_INDEL_TRAINING.vcf --knownSites CERATINA_SNP_TRAINING.vcf -o cSoc01.recal.table
+
+
+java -jar ./gatk-4.1.3.0/gatk-package-4.1.3.0-local.jar CombineGVCFs -R /data3/ASM165200v1_rename.fa --variant cSoc_01_raw_variants_BR.g.vcf --variant cSoc_02_raw_variants_BR.g.vcf --variant cSoc_03_raw_variants_BR.g.vcf --variant cSoc_04_raw_variants_BR.g.vcf --variant cSoc_05_raw_variants_BR.g.vcf --variant cSoc_06_raw_variants_BR.g.vcf --variant cSoc_07_raw_variants_BR.g.vcf --variant cSoc_08_raw_variants_BR.g.vcf --variant cSoc_09_raw_variants_BR.g.vcf --variant cSoc_10_raw_variants_BR.g.vcf --variant cSol_01_raw_variants_BR.g.vcf --variant cSol_02_raw_variants_BR.g.vcf --variant cSol_03_raw_variants_BR.g.vcf --variant cSol_04_raw_variants_BR.g.vcf --variant cSol_05_raw_variants_BR.g.vcf --variant cSol_06_raw_variants_BR.g.vcf --variant cSol_07_raw_variants_BR.g.vcf --variant cSol_08_raw_variants_BR.g.vcf --variant cSol_09_raw_variants_BR.g.vcf --variant cSol_10_raw_variants_BR.g.vcf -O Soc_Sol_all.g.vcf
+
+
+**combine GVCF not working, maybe try GenomicsDBImport
+
+
+----------april 20---------
+#combineGVCFs worked! it took 33hrs (completed april 7)
+
+java -jar ./gatk-4.1.3.0/gatk-package-4.1.3.0-local.jar GenotypeGVCFs -R /data3/ASM165200v1_rename.fa --variant Soc_Sol_all.g.vcf -O Soc_Sol_all_gvcf.g.vcf --allow-old-rms-mapping-quality-annotation-data
+
+#genotypeGVCF about 3 hrs
+
+java -jar ./gatk-4.1.3.0/gatk-package-4.1.3.0-local.jar SelectVariants -R /data3/ASM165200v1_rename.fa -V Soc_Sol_all_gvcf.g.vcf --select-type SNP -O Soc_Sol_snp.vcf
+
+java -jar ./gatk-4.1.3.0/gatk-package-4.1.3.0-local.jar SelectVariants -R /data3/ASM165200v1_rename.fa -V Soc_Sol_all_gvcf.g.vcf --select-type INDEL -O Soc_Sol_indel.vcf
+
+java -Xmx4g -jar ./gatk-4.1.3.0/gatk-package-4.1.3.0-local.jar VariantRecalibrator -R /data3/ASM165200v1_rename.fa -V Soc_Sol_snp.vcf -O Soc_Sol.recal --tranches-file Soc_Sol.tranches -resource:hapmap,known=false,training=true,truth=true,prior=15.0 CERATINA_SNP_TRAINING.vcf -an QD -an DP -an MQ -an MQRankSum -an FS -an ReadPosRankSum -an SOR -mode SNP
+
+#make table and import into R
+java -jar ./gatk-4.1.3.0/gatk-package-4.1.3.0-local.jar VariantsToTable -R /data3/ASM165200v1_rename.fa -V Soc_Sol_snp.vcf -F CHROM -F POS -F QUAL -F QD -F DP -F MQ -F MQRankSum -F FS -F ReadPosRankSum -F SOR -O Soc_Sol_GVCFall_SNPs.table
+
+#apr 22- tried 99.0 instead of 99.5
+java -Xmx3g -jar ./gatk-4.1.3.0/gatk-package-4.1.3.0-local.jar ApplyVQSR -R /data3/ASM165200v1_rename.fa -V Soc_Sol_snp.vcf -O Soc_Sol_recalibrated_snp.vcf --truth-sensitivity-filter-level 99.0 --tranches-file Soc_Sol.tranches --recal-file Soc_Sol.recal -mode SNP
+
+#GATK recommendations
+java -jar ./gatk-4.1.3.0/gatk-package-4.1.3.0-local.jar VariantFiltration -R /data3/ASM165200v1_rename.fa -V Soc_Sol_recalibrated_snp.vcf --filter-expression "QD < 2.0" --filter-name "LowQD2" -O Soc_Sol_hardfiltered_1.vcf
+
+java -jar ./gatk-4.1.3.0/gatk-package-4.1.3.0-local.jar VariantFiltration -R /data3/ASM165200v1_rename.fa -V Soc_Sol_hardfiltered_1.vcf --filter-expression "MQ < 20.0" --filter-name "LowMQ20" -O Soc_Sol_hardfiltered_2.vcf
+
+#issue with FS filtering, tried all at once 
+java -jar ./gatk-4.1.3.0/gatk-package-4.1.3.0-local.jar VariantFiltration -R /data3/ASM165200v1_rename.fa -V Soc_Sol_hardfiltered_2.vcf --filter-expression "FS > 60.0" --filter-name "FS60" -O Soc_Sol_hardfiltered_3.vcf
+
+java -jar ./gatk-4.1.3.0/gatk-package-4.1.3.0-local.jar VariantFiltration -R /data3/ASM165200v1_rename.fa -V Soc_Sol_hardfiltered_3.vcf --filter-expression "ReadPosRankSum < -8.0" --filter-name "RPRSlow" --filter-expression "ReadPosRankSum > 8.0" --filter-name "RPRShigh" -O Soc_Sol_hardfiltered_4.vcf
+
+java -jar ./gatk-4.1.3.0/gatk-package-4.1.3.0-local.jar VariantFiltration -R /data3/ASM165200v1_rename.fa -V Soc_Sol_hardfiltered_4.vcf --filter-expression "MQRankSum < -12.5" --filter-name "MQRSlow" --filter-expression "MQRankSum > 12.5" --filter-name "MQRShigh" -O Soc_Sol_hardfiltered_5.vcf
+
+java -jar ./gatk-4.1.3.0/gatk-package-4.1.3.0-local.jar VariantFiltration -R /data3/ASM165200v1_rename.fa -V Soc_Sol_hardfiltered_5.vcf --filter-expression "SOR > 3.0" --filter-name "SOR" -O Soc_Sol_hardfiltered_6.vcf
+
+java -jar ./gatk-4.1.3.0/gatk-package-4.1.3.0-local.jar VariantFiltration -R /data3/ASM165200v1_rename.fa -V Soc_Sol_hardfiltered_6.vcf --filter-expression "DP < 100" --filter-name "DPlow" --filter-expression "DP > 408" --filter-name "DPhigh" -O Soc_Sol_hardfiltered_7.vcf
+
+#try all at once -- overfiltered 
+
+#java -jar ./gatk-4.1.3.0/gatk-package-4.1.3.0-local.jar VariantFiltration -R /data3/ASM165200v1_rename.fa -V Soc_Sol_recalibrated_snp.vcf --filter-expression "MQ < 20.0" --filter-name "LowMQ20" --filter-expression "QD < 2.0" --filter-name "LowQD2" --filter-expression "FS > 60.0" --filter-name "FS60" --filter-expression "MQRankSum < -2.0" --filter-name "MQRSmin5" --filter-expression "MQRankSum > 2.5" --filter-name "MQRSmax2" --filter-expression "ReadPosRankSum < -8.0" --filter-name "RPRSmin8" --filter-expression "ReadPosRankSum > 8.0" --filter-name "RPRSmax8" --filter-expression "SOR > 3.0" --filter-name "SOR" -O Soc_Sol.Hard.vcf
+
+
+java -jar ./gatk-4.1.3.0/gatk-package-4.1.3.0-local.jar VariantFiltration -R /data3/ASM165200v1_rename.fa -V Soc_Sol_hardfiltered_7.vcf --mask Soc_Sol_indel.vcf --mask-extension 5 --mask-name "Indel" -O Soc_Sol_noINDEL.vcf
+
+
+#need to make new ambiguous sites file
+#java -jar ./gatk-4.1.3.0/gatk-package-4.1.3.0-local.jar VariantFiltration -R /data2/Training_set/HAV3.1_renamed.fa -V Soc_Sol_noINDEL.vcf --mask /data2/Training_set/brock_gatk_lofreq_ambiguous_sites_lifted_over.bed --mask-extension 5 --mask-name "CNV" -O Soc_Sol_noINDEL_noCNV.vcf
+
+cat Soc_Sol_noINDEL.vcf | vcf-convert -v 4.1 > Soc_Sol_filter2.vcf 
+
+#remove anything with a flag - old way of doing things 
+#vcftools --vcf Soc_Sol_filter2.vcf --remove-filtered-all --recode --recode-INFO-all --out Soc_Sol_filter3.vcf
+
+    #anything with VQSR and any filter 
+    #below doesnt work
+    #vcftools --vcf Soc_Sol_filter2.vcf --remove-filtered Indel --remove-filtered "VQSRTrancheSNP99.90to100.00 & LowMQ40" --remove-filtered "VQSRTrancheSNP99.90to100.00 & LowQD2" --remove-filtered "VQSRTrancheSNP99.90to100.00 & FS60 " --remove-filtered "VQSRTrancheSNP99.90to100.00 & RPRShigh" --remove-filtered "VQSRTrancheSNP99.90to100.00 & MQRShigh" --remove-filtered "VQSRTrancheSNP99.90to100.00 & SOR" --recode --recode-INFO-all --out Soc_Sol_filter4.vcf
+
+    #vcftools --vcf Soc_Sol_filter2.vcf --remove-filtered Indel --remove-filtered "LowMQ40;VQSRTrancheSNP99.90to100.00" --remove-filtered "LowQD2;VQSRTrancheSNP99.90to100.00" --remove-filtered "FS60;VQSRTrancheSNP99.90to100.00" --remove-filtered "RPRShigh;VQSRTrancheSNP99.90to100.00" --remove-filtered "MQRShigh;VQSRTrancheSNP99.90to100.00" --remove-filtered "SOR;VQSRTrancheSNP99.90to100.00" --recode --recode-INFO-all --out Soc_Sol_filter5.vcf
+
+#look in python for all filter names 
+
+
+        }
+
+#worked!
+#april 28- added in if statement to maintain header 
+
+awk -F '\t' '{if($0 ~ /\#/) print; else if (($7 == "LowMQ20") || ($7 == "LowQD2") || ($7 == "FS60") || ($7 == "RPRShigh") || ($7 == "MQRShigh") || ($7 == "SOR") || ($7 == "PASS") || ($7 == "VQSRTrancheSNP99.90to100.00") || ($7 == "VQSRTrancheSNP99.00to99.90") || ($7 == "DPlow") || ($7 == "DPhigh")) print}'  Soc_Sol_filter2.vcf > Soc_Sol_filter_3.vcf
+
+#need to add in CNV, min threshold missing data 
+#then next step is PCA
+
+#get DP from depth.txt- use python code to get IQR then record in excel and get 1.5*IQR
+#check values for DPlow - min 10 reads per = 200 or 5 reads per and 100 
+
+
+-------------april 28--------
+
+#see Data Management and Summary Statistics with PLINK by Christopher C. Chang chapter 3
+
+plink_linux_x86_64_20200428/plink --vcf Soc_Sol_filter_3.vcf --keep-allele-order --make-bed --allow-extra-chr --out converted_ceratina
+
+
+------april 29---------
+#prune for linkage (makes prune.in and prune.out files)
+plink_linux_x86_64_20200428/plink --vcf Soc_Sol_filter_3.vcf --double-id --allow-extra-chr --set-missing-var-ids @:# --indep-pairwise 50 10 0.1 --out ceratina_trial
+
+plink_linux_x86_64_20200428/plink --vcf Soc_Sol_filter_3.vcf --double-id --allow-extra-chr --set-missing-var-ids @:# --extract ceratina_trial.prune.in --make-bed --pca --out ceratina
+
+-------R--------
+# load tidyverse package
+library(tidyverse)
+
+pca <- read_table2('/Users/dovabrenman/Desktop/R/ceratina.eigenvec', col_names = FALSE)
+eigenval <- scan('/Users/dovabrenman/Desktop/R/ceratina.eigenval')
+# sort out the pca data
+# remove nuisance column
+pca <- pca[,-1]
+# set names
+names(pca)[1] <- "ind"
+names(pca)[2:ncol(pca)] <- paste0("PC", 1:(ncol(pca)-1))
+spp <- rep(NA, length(pca$ind))
+spp[grep("Soc", pca$ind)] <- "Social"
+spp[grep("Sol", pca$ind)] <- "Solitary"
+
+# remake data.frame
+pca <- as.tibble(data.frame(pca, spp))
+
+# first convert to percentage variance explained (sample data said 16- check if this is a problem)
+pve <- data.frame(PC = 1:20, pve = eigenval/sum(eigenval)*100)
+
+# make plot
+a <- ggplot(pve, aes(PC, pve)) + geom_bar(stat = "identity")
+a + ylab("Percentage variance explained") + theme_light()
+
+# calculate the cumulative sum of the percentage variance explained
+cumsum(pve$pve)
+
+output: 
+[1]  11.57778  22.15524  31.71873  38.52788  44.70547  50.27162  55.05642  59.74690
+ [9]  64.23084  68.67037  72.64336  76.60752  80.52603  84.36214  88.17544  91.87669
+[17]  95.54061  99.13964 101.66189 100.00000
+
+
+--------- may 1 ----------------
+#may 1 - add in MAF > 0.05 (5% minor allele freq)
+
+vcftools --vcf Soc_Sol_noINDEL.vcf --maf 0.05 --recode --out Soc_Sol_noINDEL_maf.vcf
+
+
+cat Soc_Sol_noINDEL_maf.vcf.recode.vcf | vcf-convert -v 4.1 > Soc_Sol_filter2.vcf 
+
+awk -F '\t' '{if($0 ~ /\#/) print; else if (($7 == "LowMQ20") || ($7 == "LowQD2") || ($7 == "FS60") || ($7 == "RPRShigh") || ($7 == "MQRShigh") || ($7 == "SOR") || ($7 == "PASS") || ($7 == "VQSRTrancheSNP99.90to100.00") || ($7 == "VQSRTrancheSNP99.00to99.90") || ($7 == "DPlow") || ($7 == "DPhigh")) print}' Soc_Sol_filter2.vcf > Soc_Sol_filter_3.vcf
+
+
+
+plink_linux_x86_64_20200428/plink --vcf Soc_Sol_filter_3.vcf --keep-allele-order --make-bed --allow-extra-chr --out converted_ceratina
+
+plink_linux_x86_64_20200428/plink --vcf Soc_Sol_filter_3.vcf --double-id --allow-extra-chr --set-missing-var-ids @:# --indep-pairwise 50 10 0.1 --out ceratina_trial
+
+plink_linux_x86_64_20200428/plink --vcf Soc_Sol_filter_3.vcf --double-id --allow-extra-chr --set-missing-var-ids @:# --extract ceratina_trial.prune.in --make-bed --pca --out ceratina
+
+
+#check the chromosome names, make sure all start with NW
+awk -F '\t' '{if($0 ~ /\#/) print; else if (($0 =! "NW_*")) print}' Soc_Sol_filter_3.vcf > Soc_Sol_filter_3_names.vcf
+
+
+
+-----------june 29
+#brock's thesis - 0.025 for MAF
+vcftools --vcf Soc_Sol_noINDEL.vcf --maf 0.025 --recode --out Soc_Sol_noINDEL_maf_025.vcf
+
+cat Soc_Sol_noINDEL_maf_025.vcf.recode.vcf | vcf-convert -v 4.1 > Soc_Sol_filter2_025.vcf 
+
+awk -F '\t' '{if($0 ~ /\#/) print; else if (($7 == "LowMQ20") || ($7 == "LowQD2") || ($7 == "FS60") || ($7 == "RPRShigh") || ($7 == "MQRShigh") || ($7 == "SOR") || ($7 == "PASS") || ($7 == "VQSRTrancheSNP99.90to100.00") || ($7 == "VQSRTrancheSNP99.00to99.90") || ($7 == "DPlow") || ($7 == "DPhigh")) print}' Soc_Sol_filter2_025.vcf > Soc_Sol_filter_3_025.vcf
+
+vcftools --vcf Soc_Sol_filter_3_025.vcf --weir-fst-pop population_1.txt --weir-fst-pop population_2.txt --out pop1_vs_pop2_025
+
+
+sed '/\.\/\./d' Soc_Sol_filter_3_025.vcf > Soc_Sol_filter_3_025_noMiss.vcf
+
+vcftools --vcf Soc_Sol_filter_3_025_noMiss.vcf --weir-fst-pop population_1.txt --weir-fst-pop population_2.txt --out pop1_vs_pop2_025
+
+
+
