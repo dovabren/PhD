@@ -1,0 +1,71 @@
+##May 13 2022
+#select 25K SNPs = 0.014% of total (25,000/1,743963)
+
+shuf -n 25000 Soc_Sol_filter_3_025.vcf > Soc_Sol_random25_A.vcf 
+shuf -n 25000 Soc_Sol_filter_3_025.vcf > Soc_Sol_random25_B.vcf 
+shuf -n 25000 Soc_Sol_filter_3_025.vcf > Soc_Sol_random25_C.vcf 
+
+#add header back on 
+grep '^#' Soc_Sol_filter_3_025.vcf > Soc_Sol_filter_3_025_header.txt
+
+cat Soc_Sol_filter_3_025_header.txt Soc_Sol_random25_A.vcf > Soc_Sol_random25_header_A.vcf 
+cat Soc_Sol_filter_3_025_header.txt Soc_Sol_random25_B.vcf > Soc_Sol_random25_header_B.vcf 
+cat Soc_Sol_filter_3_025_header.txt Soc_Sol_random25_C.vcf > Soc_Sol_random25_header_C.vcf 
+
+vcftools --vcf Soc_Sol_random25_header_A.vcf --plink-tped --out PlinkOutFile_A
+
+vcftools --vcf Soc_Sol_random25_header_B.vcf --plink-tped --out PlinkOutFile_B
+
+vcftools --vcf Soc_Sol_random25_header_C.vcf --plink-tped --out PlinkOutFile_C
+
+/data3/dova_nanuq_raw_data/plink_linux_x86_64_20200428/plink --noweb --tfile PlinkOutFile_A --make-bed --out BedOutFile_A
+
+/data3/dova_nanuq_raw_data/plink_linux_x86_64_20200428/plink --noweb --tfile PlinkOutFile_B --make-bed --out BedOutFile_B
+
+/data3/dova_nanuq_raw_data/plink_linux_x86_64_20200428/plink --noweb --tfile PlinkOutFile_C --make-bed --out BedOutFile_C
+
+for K in 1 2 3 4; \
+do admixture --cv=10 BedOutFile_A.bed $K | tee /AdmixtureOut_A.${K}.out; done
+
+for K in 1 2 3 4; \
+do admixture --cv=10 BedOutFile_B.bed $K | tee /AdmixtureOut_B.${K}.out; done
+
+for K in 1 2 3 4; \
+do admixture --cv=10 BedOutFile_C.bed $K | tee /AdmixtureOut_C.${K}.out; done
+
+#plot error 
+
+
+
+#plot Q estimates in R- stacked bar graph
+library(ggplot2)
+
+tbl=read.table("BedOutFile_C.1.Q")
+png(file="sampleC_k_1.png",width=600, height=350)
+barplot(t(as.matrix(tbl)), col=rainbow(3), xlab="Individual #", ylab="Ancestry", border=NA)
+
+colnames(tbl) <- paste0("Soc1, Soc2, Soc3, Soc4, Soc5, Soc6, Soc7, Soc8, Soc9, Soc10, Sol1, Sol2, Sol3, Sol4, Sol5,Sol6,Sol7,Sol7,Sol9,Sol10 ", 1:ncol(tbl))
+dev.off()
+
+tbl=read.table("BedOutFile_C.2.Q")
+png(file="sampleC_k_2.png",width=600, height=350)
+barplot(t(as.matrix(tbl)), col=rainbow(3), xlab="Individual #", ylab="Ancestry", border=NA)
+
+colnames(tbl) <- paste0("Soc1, Soc2, Soc3, Soc4, Soc5, Soc6, Soc7, Soc8, Soc9, Soc10, Sol1, Sol2, Sol3, Sol4, Sol5,Sol6,Sol7,Sol7,Sol9,Sol10 ", 1:ncol(tbl))
+dev.off()
+
+tbl=read.table("BedOutFile_C.3.Q")
+png(file="sampleC_k_3.png",width=600, height=350)
+barplot(t(as.matrix(tbl)), col=rainbow(3), xlab="Individual #", ylab="Ancestry", border=NA)
+
+colnames(tbl) <- paste0("Soc1, Soc2, Soc3, Soc4, Soc5, Soc6, Soc7, Soc8, Soc9, Soc10, Sol1, Sol2, Sol3, Sol4, Sol5,Sol6,Sol7,Sol7,Sol9,Sol10 ", 1:ncol(tbl))
+dev.off()
+
+tbl=read.table("BedOutFile_C.4.Q")
+png(file="sampleC_k_4.png",width=600, height=350)
+barplot(t(as.matrix(tbl)), col=rainbow(3), xlab="Individual #", ylab="Ancestry", border=NA)
+
+colnames(tbl) <- paste0("Soc1, Soc2, Soc3, Soc4, Soc5, Soc6, Soc7, Soc8, Soc9, Soc10, Sol1, Sol2, Sol3, Sol4, Sol5,Sol6,Sol7,Sol7,Sol9,Sol10 ", 1:ncol(tbl))
+dev.off()
+
+

@@ -1,0 +1,229 @@
+#OrthoDB
+           #finds all level number  odb11v0_levels.tab: 
+            1.	level NCBI tax id
+            2.	scientific name
+            3.	total non-redundant count of genes in all underneath clustered species
+            4.	total count of OGs built on it
+            5.	total non-redundant count of species underneath
+
+           #used to find 156304 odb11v0_species.tab 
+            1.	NCBI tax id
+            2.	OrthoDB individual organism id, based on NCBI tax id
+            3.	scientific name inherited from the most relevant NCBI tax id
+            4.	genome asssembly id, when available
+            5.	total count of clustered genes in this species
+            6.	total count of the OGs it participates
+            7.	mapping type, clustered(C) or mapped(M)
+
+                    odb11v0_level2species.tab 
+                    1.	top-most level NCBI tax id, one of {2, 2157, 2759, 10239}
+                    2.	OrthoDB organism id
+                    3.	number of hops between the top-most level id and the NCBI tax id assiciated with the organism
+                    4.	ordered list of OrthoDB selected intermediate levels from the top-most level to the bottom one
+
+            #used odb11v0_genes.tab
+            1.	OrthoDB unique gene id (not stable between releases)
+            2.	OrthoDB individual organism id
+            3.	protein original sequence id, as downloaded along with the sequence
+            4.	semicolon separated list of synonyms, evaluated by mapping
+            5.	Uniprot id, evaluated by mapping
+            6.	semicolon separated list of ids from Ensembl, evaluated by mapping
+            7.	NCBI gid or gene name, evaluated by mapping
+            8.	description, evaluated by mapping
+
+                        #GO terms odb11v0_gene_xrefs.tab  
+                        1.	OrthoDB gene id
+                        2.	external gene identifier, either mapped or the original sequence id from Genes table
+                        3.	external DB name, one of {GOterm, InterPro, NCBIproteinGI, UniProt, ENSEMBL, NCBIgid, NCBIgenename}
+
+                        odb11v0_OGs.tab #dont know how to use
+                        1.	OG unique id (not stable between releases)
+                        2.	level tax_id on which the group was built
+                        3.	OG name (the most common gene name within the group)
+
+                #used odb11v0_OG2genes.tab
+                1.	OG unique id
+                2.	OrthoDB gene id
+
+                        #GO terms  odb11v0_OG_xrefs.tab 
+                        1.	OG unique id
+                        2.	external DB or DB section
+                        3.	external identifier
+                        4.	number of genes in the OG associated with the identifier
+
+
+
+
+import pandas as pd
+ortho_species = pd.read_csv('/data3/dova_nanuq_raw_data/orthoDB/odb11v0_species.tab', sep='\t', header=None)
+ortho_species.columns = ['NCBI_tax_ID', 'ODB_Org_ID_fromNCBITax','Sci_Name','Genome_Assemb_ID','Num_Clust_Genes_perSpecies','Num_OrthoGroups','Mapping_Type']
+
+#add header
+(echo -e "NCBI_tax_ID\tODB_Org_ID_fromNCBITax\tSci_Name\tGenome_Assemb_ID\tNum_Clust_Genes_perSpecies\tNum_OrthoGroups\tMapping_Type" ; cat odb11v0_species.tab) > odb11v0_species_2.tab
+
+
+ortho_genes = pd.read_csv('/data3/dova_nanuq_raw_data/orthoDB/odb11v0_genes.tab', sep='\t', header=None)
+ortho_genes.columns = ['OrthoDB_gene_ID', 'OrthoDB_ind_Org_ID', 'protein_seq_ID','synonyms_list','Uniprot_ID','Ensembl_ID','NCBI_gene_ID','Description']
+
+#add header
+(echo -e "OrthoDB_gene_ID\tOrthoDB_ind_Org_ID\tprotein_seq_ID\tsynonyms_list\tUniprot_ID\tEnsembl_ID\tNCBI_gene_ID\tDescription" ; cat odb11v0_genes.tab) > odb11v0_genes_2.tab 
+
+ortho_groups_togene = pd.read_csv('/data3/dova_nanuq_raw_data/orthoDB/odb11v0_OG2genes.tab', sep='\t', header=None)
+ortho_groups_togene.columns = ['OG_unique_id','OrthoDB_gene_ID']
+
+#add header
+(echo -e "OG_unique_id\tOrthoDB_gene_ID"; cat odb11v0_OG2genes.tab) > odb11v0_OG2genes_2.tab
+
+
+
+ortho_groups = pd.read_csv('/data3/dova_nanuq_raw_data/orthoDB/odb11v0_OGs.tab', sep='\t', header=None)
+ortho_groups.columns = ['OG_unique_id','Level_tax_ID','OG_name']
+
+#add header
+(echo -e "OG_unique_id\tLevel_tax_ID\tOG_name"; cat odb11v0_OGs.tab) > odb11v0_OGs_2.tab
+
+
+
+ortho_levels = pd.read_csv('/data3/dova_nanuq_raw_data/orthoDB/odb11v0_levels.tab', sep='\t', header=None)
+ortho_levels.columns = ['level_NCBI_tax_ID','Sci_Name_level','Gene_count_under_cluster','Count_OrthoGroup_built','Species_count_under_cluster']
+
+#add header
+(echo -e "level_NCBI_tax_ID\tSci_Name_level\tGene_count_under_cluster\tCount_OrthoGroup_built\tSpecies_count_under_cluster" ; cat odb11v0_levels.tab) > odb11v0_levels_2.tab
+
+external_genes = pd.read_csv('/data3/dova_nanuq_raw_data/orthoDB/odb11v0_gene_xrefs.tab', sep='\t', header=None)
+external_genes.columns = ['OrthoDB_gene_ID','external_gene_identifier', 'external_DB_name']
+
+#add header
+(echo -e "OrthoDB_gene_ID\texternal_gene_identifier\texternal_DB_name" ; cat odb11v0_gene_xrefs.tab) > odb11v0_gene_xrefs_2.tab
+
+
+
+level2species = pd.read_csv('/data3/dova_nanuq_raw_data/orthoDB/odb11v0_level2species.tab', sep='\t', header=None)
+level2species.columns=['top_NCBI_tax_id','OrthoDB_Org_ID', 'top_levelID_NCBItaxID_hops','ODB_ordered_inter_levels_fromtop']
+
+#add header
+(echo -e "top_NCBI_tax_id\tOrthoDB_Org_ID\ttop_levelID_NCBItaxID_hops\tODB_ordered_inter_levels_fromtop"; cat odb11v0_level2species.tab) > odb11v0_level2species_2.tab
+
+external_OG = pd.read_csv('/data3/dova_nanuq_raw_data/orthoDB/odb11v0_OG_xrefs.tab', sep='\t', header=None)
+external_OG.columns=['OG_unique_id','external_DB','external_ID','num_genes_in_OG_with_ID']
+
+#add header
+(echo -e "OG_unique_id\texternal_DB\texternal_ID\tnum_genes_in_OG_with_ID"; cat odb11v0_OG_xrefs.tab) > odb11v0_OG_xrefs_2.tab
+
+
+
+
+#all genes with an annotation = 11,103
+#find all 156304_0
+grep -i '156304_0' odb11v0_genes_2.tab > odb11v0_genes_ccalc.txt 
+
+
+grep -i '2759' odb11v0_OG2genes.tab > odb11v0_OG2genes_E.tab
+(echo -e "OrthoDB_gene_ID\tOrthoDB_ind_Org_ID\tprotein_seq_ID\tsynonyms_list\tUniprot_ID\tEnsembl_ID\tNCBI_gene_ID\tDescription" ; cat odb11v0_genes_ccalc.tab) > odb11v0_genes_2_ccalc.tab
+
+
+#split ORthoDB_gene_ID and search for only ccalc
+awk -F'\t' '{gsub(/[:]/, "\t", $2)} 1' OFS='\t' odb11v0_OG2genes_2.tab > odb11v0_OG2genes_2_split.tab
+
+#add new header
+
+
+awk 'NR==1{print $1" "$2" gene_ID_end" ;next}{print}' odb11v0_OG2genes_2_split.tab > odb11v0_OG2genes_2_split_2.tab
+
+#search for only ccalc, reduce the file size (overwrite old)
+grep -i '156304_0' odb11v0_OG2genes_2_split_2.tab > odb11v0_OG2genes_2_split_3.tab 
+
+#add colon back in
+
+awk '{print $0" "$2":"$3}' odb11v0_OG2genes_2_split_3.tab > odb11v0_OG2genes_2_split_4.tab
+
+#drop columns 1 and 2
+awk '{$2=$3=""; print $0}' odb11v0_OG2genes_2_split_4.tab > odb11v0_OG2genes_2_split_5.tab
+
+#add in column header
+(echo -e "OG_unique_id\tOrthoDB_gene_ID" ; cat odb11v0_OG2genes_2_split_5.tab) > odb11v0_OG2genes_2_split_6.tab
+
+#overlap oodb11v0_OG2genes_2_split_6.tab with odb11v0_genes_2_ccalc.tab at column "OrthoDB_gene_ID"
+#done in python 
+
+
+## Nov 21- new dataframe for each tax level
+grep -i 33208  odb11v0_OGs_2.tab > odb11v0_OGs_2_metazoa.tab
+
+
+awk -F' ' '$2=="2759"' odb11v0_OGs_2.tab > odb11v0_OGs_2_eukaryota.tab
+
+awk -F' ' '$2=="33208"' odb11v0_OGs_2.tab > odb11v0_OGs_2_metazoa.tab
+
+awk -F' ' '$2=="6656"' odb11v0_OGs_2.tab > odb11v0_OGs_2_arthropoda.tab
+
+awk -F' ' '$2=="6960"' odb11v0_OGs_2.tab > odb11v0_OGs_2_hexapoda.tab
+
+awk -F' ' '$2=="50557"' odb11v0_OGs_2.tab > odb11v0_OGs_2_insecta.tab
+
+awk -F' ' '$2=="33392"' odb11v0_OGs_2.tab > odb11v0_OGs_2_holometabola.tab
+
+awk -F' ' '$2=="7399"' odb11v0_OGs_2.tab > odb11v0_OGs_2_hymenoptera.tab
+
+awk -F' ' '$2=="7434"' odb11v0_OGs_2.tab > odb11v0_OGs_2_aculeata.tab
+
+awk -F' ' '$2=="34735"' odb11v0_OGs_2.tab > odb11v0_OGs_2_apoidea.tab
+
+awk -F' ' '$2=="156304"' odb11v0_OGs_2.tab > odb11v0_OGs_2_ceratina.tab
+
+
+
+awk -F'\t' '{gsub(/[:]/, "\t", $2)} 1' OFS='\t' odb11v0_OG2genes.tab > odb11v0_OG2genes_split_species.tab
+
+awk -F'\t' '{gsub(/[at]/, "\t", $1)} 1' OFS='\t' odb11v0_OG2genes_split_species.tab > odb11v0_OG2genes_split_species_2.tab
+
+
+
+
+merge 
+ceratina_restricted_Nov22.txt -- column 2 
+odb11v0_genes_2.tab -- column 1
+
+# Nov 23, 2022
+#find intersection of all genes and genes with ortho groups info
+#join -1 2 -2 1 <(sort odb11v0_OG2genes_2_split_6.tab -k2b,2) <(sort odb11v0_OGs.tab) | awk -F " " '{print $2 "\t" $1 "\t" $3 "\t" $4 "\t" $5 "\t" $6 "\t" $7}' > odb11v0_genes_2_OG2genes.tab
+
+
+join -1 2 -2 1 <(sort odb11v0_OG2genes.tab  -k2b,2) <(sort odb11v0_genes_2_ccalc.tab) | awk -F "\t" '{print $2 "\t" $1 "\t" $3 "\t" $4 "\t" $5 "\t" $6 "\t" $7}' > odb11v0_genes_2_OG2genes.tab
+#change file separation
+
+awk -F' ' '$2=="156304_0"' odb11v0_genes_2.tab > odb11v0_genes_2_ccalc.tab
+
+tr ' ' '\t' < odb11v0_genes_2_OG2genes.tab<> odb11v0_genes_2_OG2genes_2.tab
+
+cut -f2- odb11v0_genes_2_OG2genes.tab > odb11v0_genes_2_OG2genes_2.tab
+#check if it worked then remove odb11v0_genes_2_OG2genes.tab
+
+#get genes associated with each tax level
+join -1 2 -2 1 <(sort odb11v0_OG2genes.tab  -k2b,2) <(sort odb11v0_genes_2_ccalc.tab) | awk -F "\t" '{print $2 "\t" $1 "\t" $3 "\t" $4 "\t" $5 "\t" $6 "\t" $7}' > odb11v0_genes_2_OG2genes.tab
+
+
+join -1 2 -2 1 <(sort odb11v0_OG2genes.tab  -k2b,2) <(sort odb11v0_genes_2_ccalc_2.tab) | awk -F "\t" '{print $2 "\t" $1 "\t" $3 "\t" $4 "\t" $5 "\t" $6 "\t" $7}' > odb11v0_genes_2_OG2genes.tab
+
+
+
+#get difference from each level 
+
+awk 'NR==FNR{a[$1];next} !($2 in a)' odb11v0_OGs_2_eukaryota.tab odb11v0_genes_2_OG2genes_2.tab > odb11v0_genes_2_OG2genes_NE.tab
+
+    awk 'NR==FNR{a[$1];next} !($2 in a)' odb11v0_OGs_2_metazoa.tab odb11v0_genes_2_OG2genes_NE.tab > odb11v0_genes_2_OG2genes_NM.tab
+
+    awk 'NR==FNR{a[$1];next} !($1 in a)' odb11v0_OGs_2_arthropoda.tab odb11v0_genes_2_OG2genes_NM.tab > odb11v0_genes_2_OG2genes_NA.tab
+
+    awk 'NR==FNR{a[$1];next} !($1 in a)' odb11v0_OGs_2_hexapoda.tab odb11v0_genes_2_OG2genes_NA.tab > odb11v0_genes_2_OG2genes_NHe.tab
+
+    awk 'NR==FNR{a[$1];next} !($1 in a)' odb11v0_OGs_2_insecta.tab odb11v0_genes_2_OG2genes_NHe.tab > odb11v0_genes_2_OG2genes_NI.tab
+
+    awk 'NR==FNR{a[$1];next} !($1 in a)' odb11v0_OGs_2_holometabola.tab odb11v0_genes_2_OG2genes_NI.tab > odb11v0_genes_2_OG2genes_NHo.tab
+
+    awk 'NR==FNR{a[$1];next} !($1 in a)' odb11v0_OGs_2_hymenoptera.tab odb11v0_genes_2_OG2genes_NHo.tab > odb11v0_genes_2_OG2genes_NHy.tab
+
+    awk 'NR==FNR{a[$1];next} !($1 in a)' odb11v0_OGs_2_aculeata.tab odb11v0_genes_2_OG2genes_NHy.tab > odb11v0_genes_2_OG2genes_NAc.tab
+
+    awk 'NR==FNR{a[$1];next} !($1 in a)' odb11v0_OGs_2_apoidea.tab odb11v0_genes_2_OG2genes_NAc.tab > odb11v0_genes_2_OG2genes_NAp.tab #doesnt work 
+    

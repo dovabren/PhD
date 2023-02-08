@@ -1,0 +1,184 @@
+1. #https://speciationgenomics.github.io/ADMIXTURE/
+
+bgzip -c Soc_Sol_filter_3_025.vcf > Soc_Sol_filter_3_025.vcf.gz
+
+
+/data3/dova_nanuq_raw_data/plink_linux_x86_64_20200428/plink --vcf Soc_Sol_filter_3_025.vcf.gz --make-bed --out SOc_Sol_admix --allow-extra-chr
+
+
+        128827 MB RAM detected; reserving 64413 MB for main workspace.
+        --vcf: SOc_Sol_admix-temporary.bed + SOc_Sol_admix-temporary.bim +
+        SOc_Sol_admix-temporary.fam written.
+        1743963 variants loaded from .bim file.
+        20 people (0 males, 0 females, 20 ambiguous) loaded from .fam.
+        Ambiguous sex IDs written to SOc_Sol_admix.nosex .
+        Using 1 thread (no multithreaded calculations invoked).
+        Before main variant filters, 20 founders and 0 nonfounders present.
+        Calculating allele frequencies... done.
+        Total genotyping rate is 0.829803.
+        1743963 variants and 20 people pass filters and QC.
+        Note: No phenotypes present.
+        --make-bed to SOc_Sol_admix.bed + SOc_Sol_admix.bim + SOc_Sol_admix.fam ...
+        done.
+awk '{$1="0";print $0}' SOc_Sol_admix.bim > SOc_Sol_admix.bim.tmp
+
+mv SOc_Sol_admix.bim.tmp SOc_Sol_admix.bim
+
+#We will run it with cross-validation (the default is 5-fold CV, for higher, choose e.g. cv=10) and K=2.
+admixture --cv SOc_Sol_admix.bed 2 > log2.out
+
+#ADMIXTURE produced 2 files: .Q which contains cluster assignments for each individual and .P which contains for each SNP the population allele frequencies.
+#Let’s now run it in a for loop with K=3 to K=5 and direct the output into log files
+nano admix_for.txt
+        for i in {3..5}
+        do
+         admixture --cv SOc_Sol_admix.bed $i > log${i}.out
+        done
+
+
+admix_for.txt 
+
+
+#To identify the best value of k clusters which is the value with lowest cross-validation error, we need to collect the cv errors. Below are three different ways to extract the number of K and the CV error for each corresponding K.
+
+grep "CV" *out | awk '{print $3,$4}' | sed -e 's/(//;s/)//;s/://;s/K=//'  > SOc_Sol_admix.cv.error
+grep "CV" *out | awk '{print $3,$4}' | cut -c 4,7-20 > SOc_Sol_admix.cv.error
+awk '/CV/ {print $3,$4}' *out | cut -c 4,7-20 > SOc_Sol_admix.cv.error
+
+awk '{split($1,name,"."); print $1,name[2]}' SOc_Sol_admix.nosex > SOc_Sol_admix.list
+
+wget https://github.com/speciationgenomics/scripts/raw/master/plotADMIXTURE.r
+
+chmod +x plotADMIXTURE.r
+
+Rscript plotADMIXTURE.r -p SOc_Sol_admix -i SOc_Sol_admix.list -k 5 -l Soc1, Soc2, Soc3, Soc4, Soc5, Soc6, Soc7, Soc8, Soc9, Soc10, Sol1, Sol2, Sol3, Sol4, Sol5, Sol6, Sol7, Sol8, Sol9, Sol10
+
+
+
+2. https://plantarum.ca/2021/06/01/admixture/
+
+/data3/dova_nanuq_raw_data/plink_linux_x86_64_20200428/plink --vcf Soc_Sol_filter_3_025.vcf.gz --make-bed --out SOc_Sol_admix --allow-extra-chr 0
+
+mkdir ktests 
+
+for K in `seq -w 1 5` 
+do
+    admixture --cv SOc_Sol_admix.bed $K > ktests/k${K}.out
+done
+
+# stopped after 7, really only need after 5
+#make all into 1 table
+grep -h CV ktests/*out
+
+
+
+grep -h CV ktests/*out > CV.csv
+
+#R graphing
+CVs <- read.table("CV.csv", sep = " ")
+CVs <- CVs[, 3:4] ## drop the first two columns
+## Remove the formatting around the K values:
+CVs[, 1] <- gsub(x = CVs[, 1], pattern = "\\(K=",
+                replacement = "")
+CVs[, 1] <- gsub(x = CVs[, 1], pattern = "\\):",
+                replacement = "") 
+head(CVs)
+x11()
+plot(CVs, xlab = "K", ylab = "CV error")
+
+#take out most likely 
+ad1 <- read.table("SOc_Sol_admix.1.Q")
+head(ad1)
+## this part didnt work
+
+
+#3. Katie's method
+vcftools --vcf Soc_Sol_filter_3_025.vcf --plink-tped --out PlinkOutFile
+
+/data3/dova_nanuq_raw_data/plink_linux_x86_64_20200428/plink --noweb --tfile PlinkOutFile --make-bed --out BedOutFile
+
+for K in 1 2 3 4; \
+do admixture --cv=10 BedOutFile.bed $K | tee /AdmixtureOut.${K}.out; done
+
+#plot error
+#plot Q estimates in R- stacked bar graph
+tbl=read.table("BedOutFile.1.Q")
+
+barplot(t(as.matrix(tbl)), col=rainbow(3),xlab="Individual #", ylab="Ancestry", border=NA)
+
+#try --cv 5
+for K in 1 2 3 4; \
+do admixture --cv=5 BedOutFile.bed $K | tee /AdmixtureOut.${K}.out; done
+
+
+##May 13 2022
+#select 25K SNPs = 0.014% of total (25,000/1,743963)
+
+shuf -n 25000 Soc_Sol_filter_3_025.vcf > Soc_Sol_random25_A.vcf 
+shuf -n 25000 Soc_Sol_filter_3_025.vcf > Soc_Sol_random25_B.vcf 
+shuf -n 25000 Soc_Sol_filter_3_025.vcf > Soc_Sol_random25_C.vcf 
+
+#add header back on 
+grep '^#' Soc_Sol_filter_3_025.vcf > Soc_Sol_filter_3_025_header.txt
+
+cat Soc_Sol_filter_3_025_header.txt Soc_Sol_random25_A.vcf > Soc_Sol_random25_header_A.vcf 
+cat Soc_Sol_filter_3_025_header.txt Soc_Sol_random25_B.vcf > Soc_Sol_random25_header_B.vcf 
+cat Soc_Sol_filter_3_025_header.txt Soc_Sol_random25_C.vcf > Soc_Sol_random25_header_C.vcf 
+
+vcftools --vcf Soc_Sol_random25_header_A.vcf --plink-tped --out PlinkOutFile_A
+
+vcftools --vcf Soc_Sol_random25_header_B.vcf --plink-tped --out PlinkOutFile_B
+
+vcftools --vcf Soc_Sol_random25_header_C.vcf --plink-tped --out PlinkOutFile_C
+
+/data3/dova_nanuq_raw_data/plink_linux_x86_64_20200428/plink --noweb --tfile PlinkOutFile_A --make-bed --out BedOutFile_A
+
+/data3/dova_nanuq_raw_data/plink_linux_x86_64_20200428/plink --noweb --tfile PlinkOutFile_B --make-bed --out BedOutFile_B
+
+/data3/dova_nanuq_raw_data/plink_linux_x86_64_20200428/plink --noweb --tfile PlinkOutFile_C --make-bed --out BedOutFile_C
+
+for K in 1 2 3 4; \
+do admixture --cv=10 BedOutFile_A.bed $K | tee /AdmixtureOut_A.${K}.out; done
+
+for K in 1 2 3 4; \
+do admixture --cv=10 BedOutFile_B.bed $K | tee /AdmixtureOut_B.${K}.out; done
+
+for K in 1 2 3 4; \
+do admixture --cv=10 BedOutFile_C.bed $K | tee /AdmixtureOut_C.${K}.out; done
+
+#plot error 
+
+
+
+#plot Q estimates in R- stacked bar graph
+library(ggplot2)
+
+tbl=read.table("BedOutFile_C.1.Q")
+png(file="sampleC_k_1.png",width=600, height=350)
+barplot(t(as.matrix(tbl)), col=rainbow(3), xlab="Individual #", ylab="Ancestry", border=NA)
+
+colnames(tbl) <- paste0("Soc1, Soc2, Soc3, Soc4, Soc5, Soc6, Soc7, Soc8, Soc9, Soc10, Sol1, Sol2, Sol3, Sol4, Sol5,Sol6,Sol7,Sol7,Sol9,Sol10 ", 1:ncol(tbl))
+dev.off()
+
+tbl=read.table("BedOutFile_C.2.Q")
+png(file="sampleC_k_2.png",width=600, height=350)
+barplot(t(as.matrix(tbl)), col=rainbow(3), xlab="Individual #", ylab="Ancestry", border=NA)
+
+colnames(tbl) <- paste0("Soc1, Soc2, Soc3, Soc4, Soc5, Soc6, Soc7, Soc8, Soc9, Soc10, Sol1, Sol2, Sol3, Sol4, Sol5,Sol6,Sol7,Sol7,Sol9,Sol10 ", 1:ncol(tbl))
+dev.off()
+
+tbl=read.table("BedOutFile_C.3.Q")
+png(file="sampleC_k_3.png",width=600, height=350)
+barplot(t(as.matrix(tbl)), col=rainbow(3), xlab="Individual #", ylab="Ancestry", border=NA)
+
+colnames(tbl) <- paste0("Soc1, Soc2, Soc3, Soc4, Soc5, Soc6, Soc7, Soc8, Soc9, Soc10, Sol1, Sol2, Sol3, Sol4, Sol5,Sol6,Sol7,Sol7,Sol9,Sol10 ", 1:ncol(tbl))
+dev.off()
+
+tbl=read.table("BedOutFile_C.4.Q")
+png(file="sampleC_k_4.png",width=600, height=350)
+barplot(t(as.matrix(tbl)), col=rainbow(3), xlab="Individual #", ylab="Ancestry", border=NA)
+
+colnames(tbl) <- paste0("Soc1, Soc2, Soc3, Soc4, Soc5, Soc6, Soc7, Soc8, Soc9, Soc10, Sol1, Sol2, Sol3, Sol4, Sol5,Sol6,Sol7,Sol7,Sol9,Sol10 ", 1:ncol(tbl))
+dev.off()
+
+

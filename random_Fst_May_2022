@@ -1,0 +1,44 @@
+move all files to apis
+
+scp <source path> <dova@servername>:/<path> 
+ 
+sudo scp /data3/dova_nanuq_raw_data/cSol_01_BQSR.sam dova@simba.biol.yorku.ca:/
+
+
+*convert all bam to sam again
+*remove all .bam for space
+
+java -jar /usr/local/src/picard-tools-2.1.0/picard.jar MergeSamFiles I=cSoc_01_BQSR.sam I=cSoc_02_BQSR.sam I=cSoc_03_BQSR.sam I=cSoc_04_BQSR.sam I=cSoc_05_BQSR.sam I=cSol_01_BQSR.sam I=cSol_03_BQSR.sam I=cSol_04_BQSR.sam I=cSol_05_BQSR.sam I=cSol_06_BQSR.sam O=A_random_merged_files.sam
+
+*delete .sam
+
+java -jar /usr/local/src/picard-tools-2.1.0/picard.jar MergeSamFiles I=cSol_02_BQSR.sam I=cSol_07_BQSR.sam I=cSol_08_BQSR.sam I=cSol_09_BQSR.sam I=cSol_10_BQSR.sam I=cSoc_06_BQSR.sam I=cSoc_07_BQSR.sam I=cSoc_08_BQSR.sam I=cSoc_09_BQSR.sam I=cSoc_10_BQSR.sam O=B_random_merged_files.sam
+
+*delete .sam
+
+    #Remove ambiguously mapped reads
+samtools view -q 20 -bS A_random_merged_files.sam | samtools sort - A_random
+
+samtools view -q 20 -bS B_random_merged_files.sam | samtools sort - B_random
+
+samtools mpileup -B map/A_random.bam map/B_random.bam > A_B_random.mpileup
+
+perl /home/arshad/progs/popoolation2_1201/mpileup2sync.pl --fastq-type sanger --min-qual 20 --input A_B_random.mpileup --output A_B_random.sync
+
+java -ea -Xmx7g -jar /home/arshad/progs/popoolation2_1201/mpileup2sync.jar --input A_B_random.mpileup --output A_B_random_java.sync --fastq-type sanger --min-qual 20 --threads 8
+
+perl /home/arshad/progs/popoolation2_1201/snp-frequency-diff.pl --input A_B_random.sync --output-prefix A_B_random --min-count 6 --min-coverage 50 --max-cover
+
+perl /home/arshad/progs/popoolation2_1201/fst-sliding.pl --input A_B_random.sync --output A_B_random.fst --suppress-noninformative --min-count 6 --min-coverage
+
+perl /home/arshad/progs/popoolation2_1201/fst-sliding.pl --input A_B_random.sync --output A_B_random_w500.fst --min-count 6 --min-coverage 50 --max-coverage 200 --min-covered-fraction 1 --window-size 500 --step-size 500 --pool-size 500
+    
+
+perl /home/arshad/progs/popoolation2_1201/fisher-test.pl --input A_B_random.sync --output A_B_random.fet --min-count 6 --min-coverage 50 --max-coverage 200 --suppress-noninformative
+
+perl /home/arshad/progs/popoolation2_1201/create-genewise-sync.pl --input A_B_random.sync --gtf 2R_exons.gtf --output A_B_random_genes.sync
+
+perl <popoolation2-path>/fst-sliding.pl --min-count 6 --min-coverage 50 --max-coverage 200 --pool-size 500 --min-covered-fraction 0.0 --window-size 1000000 --step-size 1000000 --input A_B_random_genes.sync --output A_B_random_genewise.fst
+
+
+

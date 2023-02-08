@@ -1,0 +1,28 @@
+##June 9- LD pruning and ADMIXTURE redo
+
+LD pruning:
+•	LD estimated in 50kb window using command --indep 50 5 2 --allow-extra-chr
+•	Plink used to prune for linkage using the commands --indep 50 5 2 --allow-extra-chr15
+•	729367 of 1009385 variants removed.
+
+#First I generated plink format files from the VCF:
+ /data3/dova_nanuq_raw_data/plink_linux_x86_64_20200428/plink  --vcf Soc_Sol_filter_3_025.vcf --maf 0.05 --recode --out Soc_Sol_plink_june9 --keep-autoconv --allow-extra-chr
+ 
+--> makes .map
+
+#Then I used the independent pairwise option on .ped/.map files using the command:
+
+#We pruned SNPs in PLINK (v1.9) with the following options: --indep 50 5 2.
+/data3/dova_nanuq_raw_data/plink_linux_x86_64_20200428/plink  --file Soc_Sol_plink_june9  --indep 50 5 2 --allow-extra-chr
+
+#LD was estimated in 50 kb windows across each scaffold using PLINK
+/data3/dova_nanuq_raw_data/plink_linux_x86_64_20200428/plink  --file Soc_Sol_plink_june9 --r2 --ld-window-r2 0 --ld-window-kb 50000 --allow-extra-chr
+
+#prune.out -- SNPs in LD removed
+#prune.in -- SNPs not in LD retained 
+vcftools --vcf Soc_Sol_plink_june9 --plink-tped --out PlinkOutFile_A
+
+/data3/dova_nanuq_raw_data/plink_linux_x86_64_20200428/plink --noweb --tfile PlinkOutFile_A --make-bed --out BedOutFile_A
+
+for K in 1 2 3 4; \
+do admixture --cv=10 BedOutFile_A.bed $K | tee /AdmixtureOut.${K}.out; done

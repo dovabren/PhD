@@ -1,0 +1,87 @@
+## Apis server
+#!/usr/bin/Rscript
+
+setwd("/home/dova/chapter2/snipre_doc")
+
+source("/home/dova/chapter2/snipre_doc/SnIPRE_source.R")
+source("/home/dova/chapter2/snipre_doc/my.jags2.R")
+library(lme4) 
+library(R2jags)
+library(arm)
+
+data <- read.table(file="/home/dova/chapter2/MK_table_aug4.txt", header = TRUE, sep="\t")  
+data$FR = 1 + data$FR
+data$FS = 1 + data$FS
+data$PR = 1 + data$PR
+data$PS = 1 + data$PS
+data$Trepl = 1 + data$Trepl
+data$Tsil = 1 + data$Tsil
+data$Trepl =  as.integer(data$Trepl)
+data$Tsil =  as.integer(data$Tsil)
+snplen = rowSums(data[c(2:5)]) 
+len = rowSums(data[c(7,8)]) 
+
+data = (data[(len-snplen)>1,]) 
+data = (data[(len-snplen)>1,]) 
+
+eb.res = SnIPRE(data)
+res = eb.res$new.dataset
+model = eb.res$model
+write.table(res, file = paste(InputFile, "mk_results_aug4.csv",sep=""), sep  = ",", row.names = FALSE)
+
+
+#bayesian
+source("/home/katie/snipre/Snipre/snipre_doc/B_SnIPRE_source.R")
+args = commandArgs(trailingOnly = TRUE)
+InputFile = args[1]
+
+source("/home/dova/chapter2/snipre_doc/B_SnIPRE_source.R")
+source("/home/dova/chapter2/snipre_doc/my.jags2.R")
+library(lme4)
+library(R2jags)
+library(arm)
+
+setwd("/media/data1/polistes/test/Snipre/snipre_run")
+data <- read.table(file="/home/dova/chapter2/MK_table_aug4.txt", sep="\t", header = TRUE)
+data <- read.table(InputFile, header = TRUE)
+#BSnIPRE.run <- function(data, path = ".", burnin = 500, thin = 5, iter = 2500){
+  # path will be where the chains are stored, and must also be where the ".bug" model is located
+  # burnin, thin, and iter (number iterations after burnin) are for MCMC samples
+
+data$FR = 1 + data$FR
+data$FS = 1 + data$FS
+data$PR = 1 + data$PR
+data$PS = 1 + data$PS
+data$Trepl = 1 + data$Trepl
+data$Tsil = 1 + data$Tsil
+data$Trepl =  as.integer(data$Trepl)
+data$Tsil =  as.integer(data$Tsil)
+snplen = rowSums(data[c(2:5)]) 
+len = rowSums(data[c(7,8)]) 
+
+data = (data[(len-snplen)>1,])
+
+
+BSnIPRE.run(data, burnin = 10000, thin = 4, iter = 15000)
+
+# check to make sure it finished correctly:
+# if a "sample" file is in your working directory (getwd()), or the path you sepecified)
+# is empty or not there, there is a problem
+
+
+load("samples")
+
+res.mcmc <- samples
+
+#BSnIPRE <- function(data.mcmc,mydata){
+# outputs 2 objects:  new.dataset & effects
+# new.dataset contains the estimates of the selection effect, and selection coefficient (gamma); as well as the estimates of constraint effect (Rest) and constraint (f). 
+# the "effects" may be useful if you are interested in estimation
+# of population parameters (gamma, constraint) with other assumptions than the PRF
+
+b.res <- BSnIPRE(res.mcmc, data)
+
+bres = b.res$new.dataset
+
+write.table(bres, file = paste(InputFile, "aug5.bayesianresults.csv",sep=""), sep  = ",", row.names = FALSE)
+

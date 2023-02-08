@@ -1,0 +1,18 @@
+selecting NW and attributes of 
+
+sed '/^#/ d' < /data3/dova_nanuq_raw_data/snpEff/data/ASM165200v1/genes.gff > ccalc_NW_may2022.txt
+
+cut -d' ' -f1,9 ccalc_NW_may2022.txt > ccalc_NW_may2022_2.txt
+
+awk '{ print $1,$9 }' ccalc_NW_may2022.txt > ccalc_NW_may2022_2.txt
+
+#remove duplicate files 
+awk '!seen[$0]++' ccalc_NW_may2022_2.txt > ccalc_NW_may2022_3.txt
+
+
+#select gene and attribute from drosophila gff 
+
+sed '/^#/ d' < GCF_000001215.4_Release_6_plus_ISO1_MT_genomic.gff > dmel_NT_may2022.txt
+cut -d' ' -f1,9 dmel_NT_may2022.txt > dmel_NT_may2022_2.txt
+awk '{ print $1,$9 }' dmel_NT_may2022_2.txt > dmel_NT_may2022_3.txt
+awk '!seen[$0]++' dmel_NT_may2022_3.txt > dmel_NT_may2022_4.txt

@@ -1,0 +1,48 @@
+library(readxl)
+library(ggplot2)
+
+df = read.table(file='FET_scatter.txt', header=T)
+> df
+                                     Category enrichment_score             sig
+1                                 Methylation          0.84615 non_significant
+2                          Positive_Selection          1.11429 non_significant
+3                                  Aggression          3.00000     significant
+4                           Maternal_Care_DEG          1.80851     significant
+5                           Maternal_Care_ASG          1.68182     significant
+6                           Maternal_Care_DMG          1.00000 non_significant
+7                            Maternal_Care_MG          0.52147 non_significant
+8             Mother_uniquely_upregulated_DEG          3.00000 non_significant
+9           Daughter_uniquely_upregulated_DEG          3.00000 non_significant
+10   Foraging_Mother_uniquely_upregulated_DEG          2.00000 non_significant
+11   Guarding_Mother_uniquely_upregulated_DEG          1.00000     significant
+12 Foraging_Daughter_uniquely_upregulated_DEG          1.12903 non_significant
+13 Guarding_Daughter_uniquely_upregulated_DEG          1.35294 non_significant
+14   Autumn_Daughter_uniquely_upregulated_DEG          1.00000 non_significant
+15            Foraging_Mother_vs_Daughter_DEG          1.95238     significant
+16            Guarding_Mother_vs_Daughter_DEG          1.45055     significant
+17            Mother_Foraging_vs_Guarding_DEG          1.50000 non_significant
+18          Daughter_Foraging_vs_Guarding_DEG          1.55140     significant
+19            Daughter_Foraging_vs_Autumn_DEG          1.68490 non_significant
+20            Daughter_Autumn_vs_Guarding_DEG          1.50962 non_significant
+21            Genes_associated_with_expansion          1.46154 non_significant
+
+
+library(ggplot2)
+tiff("enrichment_articles_oct27.tiff", units="in", width=5, height=5, res=300)
+png(file="enrichment_articles_oct27.tiff", width=600, height=350, res=300)
+
+plot=ggplot(df, aes(x=enrichment_score, y=Category, colour=sig))+geom_point()+theme_classic()
+
+plot
+
+dev.off()
+
+
+
+library(readxl)
+library(ggplot2)
+df = read.table(file='FET_scatter.txt', header=T)
+png(file="enrichment_articles_oct27.png", width=200, height=100, units='mm', res=100)
+plot=ggplot(df, aes(x=enrichment_score, y=Category, colour=sig))+geom_point(stat="identity")+theme_classic()
+plot
+dev.off()

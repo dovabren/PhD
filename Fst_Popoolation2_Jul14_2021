@@ -1,0 +1,81 @@
+
+#Fst Popoolation2
+#https://sourceforge.net/p/popoolation2/wiki/Tutorial/
+
+1. all .bam
+2. merge by population in .bam
+3. mpileup
+
+#Solitary_pop2.bam and Social_pop1.bam deleted from server, not backed up - can be remade from other .bam
+samtools merge Solitary_pop2.bam cSol_01_BQSR.bam cSol_02_BQSR.bam cSol_03_BQSR.bam cSol_04_BQSR.bam cSol_05_BQSR.bam cSol_06_BQSR.bam cSol_07_BQSR.bam cSol_08_BQSR.bam cSol_09_BQSR.bam cSol_10_BQSR.bam
+
+samtools merge Social_pop1.bam cSoc_01_BQSR.bam cSoc_02_BQSR.bam cSoc_03_BQSR.bam cSoc_04_BQSR.bam cSoc_05_BQSR.bam cSoc_06_BQSR.bam cSoc_07_BQSR.bam cSoc_08_BQSR.bam cSoc_09_BQSR.bam cSoc_10_BQSR.bam
+
+    #july 21
+samtools mpileup -B Social_pop1.bam Solitary_pop2.bam > p1_p2.mpileup
+
+java -ea -Xmx7g -jar /home/arshad/progs/popoolation2_1201/mpileup2sync.jar --input p1_p2.mpileup --output p1_p2_java.sync --fastq-type sanger --min-qual 20 --threads 8
+
+#Calculate allele frequency differences
+perl /home/arshad/progs/popoolation2_1201/snp-frequency-diff.pl --input p1_p2_java.sync --output-prefix p1_p2 --min-count 6 --min-coverage 50 --max-coverage 200
+
+#Fst-values: measure differentiation between populations
+#Calculate Fst for every SNP 
+perl /home/arshad/progs/popoolation2_1201/fst-sliding.pl --input p1_p2_java.sync --output p1_p2.fst --suppress-noninformative --min-count 6 --min-coverage 50 --max-coverage 200 --min-covered-fraction 1 --window-size 1 --step-size 1 --pool-size 500
+
+#Calculate Fst values using a sliding window approach
+perl /home/arshad/progs/popoolation2_1201/fst-sliding.pl --input p1_p2_java.sync --output p1_p2_w500.fst --min-count 6 --min-coverage 50 --max-coverage 200 --min-covered-fraction 1 --window-size 500 --step-size 500 --pool-size 500
+
+
+    #load into IGV (ssh -Y)
+    #First index the two bam files
+    samtools index Social_pop1.bam 
+#continue from here July 21
+    samtools index Solitary_pop2.bam 
+    #Than convert the file containing the Fst-values into the .igv format
+    perl /home/arshad/progs/popoolation2_1201/export/pwc2igv.pl --input p1_p2.fst --output p1_p2.igv
+    #Finally load the results into the IGV
+    #Start IGV
+    #Import Genome -> Load the fasta file: 2R.fasta
+    #Load the two .bam files
+    #Load the .igv file containing the Fst values
+
+    #July 22    
+#Fisher's Exact Test: estimate the significance of #allele frequency differences
+#The Fishers exact test can be used to test whether any differences in allele frequencies are statistically significant. At low coverages the absolute changes of allele frequencies or the Fst values may be strongly influenced by sampling effects, therefore the Fishers exact test may be used to identify significant changes in allele frequency.
+perl /home/arshad/progs/popoolation2_1201/fisher-test.pl --input p1_p2_java.sync --output p1_p2.fet --min-count 6 --min-coverage 50 --max-coverage 200 --suppress-noninformative
+#Note that this script provides -log10(P-value) as output.
+#Load the Fisher's exact test results into the IGV
+#First convert the Fisher's exact test results into the .igv file format:
+perl /home/arshad/progs/popoolation2_1201/export/pwc2igv.pl --input p1_p2.fet --output p1_p2_fet.igv
+
+#Than start the IGV, load the .bam alignments and the file: p1_p2_fet.igv. 
+
+
+#Calculate Fst for genes
+#remove any # lines 
+
+perl /home/arshad/progs/popoolation2_1201/create-genewise-sync.pl --input p1_p2_java.sync --gtf /data3/dova_nanuq_raw_data/snpEff/data/ASM165200v1/GFF_NCBI_download/GCF_001652005.1_ASM165200v1_genomic_noheader.gtf --output p1_p2_genes.sync
+
+    "create-genewise-sync.pl
+
+    This script is a central inovation of PoPoolation2 and enables the analysis of genes, exons, introns or any other feature present in a gtf file. It converts a synchronized file which has a coordinate system that is typically based on reference chromosomes into a synchronized file with a coordinate system based on the features present in a given gtf-file (http://mblab.wustl.edu/GTF2.html). This conversion allows to use all analysis of PoPoolation2 (Fst, fisher's exact test, CMH-test, allele frequency differences) for the given features. 
+    
+    Example before conversion: 
+    2L 5088 T 0:5:0:0:0:0 0:6:0:0:0:0 
+    2L 5089 T 0:4:0:0:0:0 0:5:0:0:0:0 ... 
+    2R 1001 T 0:5:0:0:0:0 0:6:0:0:0:0 
+    2R 1002 T 0:4:0:0:0:0 0:5:0:0:0:0 ...
+
+    Example after conversion: 
+    CG40127-RA 1 T 0:95:0:0:0:0 0:95:0:0:0:0 
+    CG40127-RA 2 G 0:0:0:97:0:0 0:0:0:97:0:0 
+    CG40127-RA 3 A 98:0:0:0:0:0 98:0:0:0:0:0
+
+    Internally all features having the same gene_id are grouped and this gene_id will act as the new id of the reference contigs. This grouping of features having the same gene_id allows to deal with exon intron structure. Note that the transcript_id of a gtf file is ignored. The position of the entries will be provided with respect to this gene_id, where intronic sequences will be ignored. Features on the minus strand will be reverse complemented (including the reference character and the allele-counts). The script also deals with overlapping features where two cases need to be distinguished. If the overlapping features have the same gene_id the script calculates the union (e.g.: many exons for every gene). On the other hand, if they have a different gene_id they are treated as separate entries and output will be provided for every individual gene_id. After conversion the main analysis of PoPoolation2 may be performed either with a sliding window or for individuals SNPs. If for example Fst should be calculated for the whole genes than the window size should be set to a number being longer than the length of any gene (eg.: 1000000)."
+    
+    
+perl /home/arshad/progs/popoolation2_1201//fst-sliding.pl --min-count 6 --min-coverage 50 --max-coverage 200 --pool-size 500 --min-covered-fraction 0.0 --window-size 1000000 --step-size 1000000 --input p1_p2_genes.sync --output p1_p2_genewise.fst
+
+
+

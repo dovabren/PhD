@@ -1,0 +1,76 @@
+library(vcfR) 
+library(poppr) 
+library(ape) 
+library(RColorBrewer)
+
+rubi.VCF <- read.vcfR("Soc_Sol_filter_3_025.vcf")
+rubi.VCF
+
+pop.data <-read.table("population_all.txt", sep="\t", header=TRUE)
+
+all(colnames(rubi.VCF@gt)[-1] ==pop.data$Sample) #TRUE
+
+gl.rubi <-vcfR2genlight(rubi.VCF)
+
+ploidy(gl.rubi) <- 2
+
+pop(gl.rubi) <- pop.data$Behavior
+
+gl.rubi
+
+#PCA
+rubi.pca <- glPca(gl.rubi, nf = 3)
+
+write.csv(rubi.pca, "pca_may2_22.csv", row.names = FALSE)
+
+
+barplot(100*rubi.pca$eig/sum(rubi.pca$eig), col = heat.colors(50), main="PCA Eigenvalues")
+
+title(ylab="Percent of variance\nexplained", line = 2) 
+title(xlab="Eigenvalues", line = 1)
+
+
+rubi.pca.scores <- as.data.frame(rubi.pca$scores) 
+rubi.pca.scores$pop <- pop(gl.rubi)
+library(ggplot2)
+set.seed(9)
+p <- ggplot(rubi.pca.scores, aes(x=PC1, y=PC2, colour=pop)) 
+p <- p + geom_point(size=2)
+p <- p + stat_ellipse(level = 0.95, size = 1)
+p <- p + scale_color_manual(values = cols)
+p <- p + geom_hline(yintercept = 0)
+p <- p + geom_vline(xintercept = 0)
+p <- p + theme_bw()
+p
+
+
+
+#DAPC
+
+pnw.dapc <- dapc(gl.rubi, n.pca = 3, n.da = 2)
+scatter(pnw.dapc, col = cols, cex = 2, legend = TRUE, clabel = F, posi.leg = "bottoml eft", scree.pca = TRUE, posi.pca = "topleft", cleg = 0.75)
+
+#compoplot(pnw.dapc,col = function(x) cols, posi = 'top')
+compoplot(pnw.dapc,col = cols, posi = 'top')
+ 
+ 
+dapc.results <- as.data.frame(pnw.dapc$posterior) dapc.results$pop <- pop(gl.rubi) dapc.results$indNames <- rownames(dapc.results)
+
+# library(reshape2)
+# dapc.results <- melt(dapc.results)
+library(tidyr)
+dapc.results <- pivot_longer(dapc.results, -c(pop, indNames))
+
+head(dapc.results, n = 6)
+
+colnames(dapc.results) <- c("Original_Pop","Sample","Assigned_Pop","Posterior_members hip_probability")
+
+p <- ggplot(dapc.results, aes(x=Sample, y=Posterior_membership_probability, fill=Assi gned_Pop))
+p <- p + geom_bar(stat='identity')
+p <- p + scale_fill_manual(values = cols)
+p <- p + facet_grid(~Original_Pop, scales = "free")
+p <- p + theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 8)) 
+p
+
+
+#DAPC

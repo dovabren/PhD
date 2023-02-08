@@ -1,0 +1,38 @@
+
+library(qqman)
+fst<-read.table('/data3/dova_nanuq_raw_data/p1_p2.fet')
+colnames(fst)<-c('CHR','POS','SNP_in_window','frac_window_with_coverage','avg_min_coverage','Fst')
+
+#remove 1:2=
+fst$Fst <- stringr::str_replace(fst$Fst, '1:2=', '')
+
+fstsubset<-fst[complete.cases(fst),]
+SNP<-c(1:(nrow(fstsubset)))
+mydf<-data.frame(SNP,fstsubset)
+
+mylabs <- unique(fst$CHR)
+fst$CHR <- as.numeric(factor(fst$CHR, levels = mylabs))
+
+jpeg(file='manhattan_may2022.jpeg')
+manhattan(mydf,chr='CHR',bp='POS',p='Fst',snp='SNP',logp=FALSE,ylab='Fst distribution Ceratina calcarata')
+dev.off()
+
+
+
+library(lattice)
+manhattan.plot<-function(chr, pos, pvalue, 
+	sig.level=NA, annotate=NULL, ann.default=list(),
+	should.thin=T, thin.pos.places=2, thin.logp.places=2, 
+	xlab="Chromosome", ylab=expression(-log[10](p-value)),
+	col=c("gray","darkgray"), panel.extra=NULL, pch=20, cex=0.8,...) {
+
+	if (length(chr)==0) stop("chromosome vector is empty")
+	if (length(pos)==0) stop("position vector is empty")
+	if (length(pvalue)==0) stop("pvalue vector is empty")
+
+	#make sure we have an ordered factor
+	if(!is.ordered(chr)) {
+		chr <- ordered(chr)
+	} else {
+		chr <- chr[,drop=T]
+	}

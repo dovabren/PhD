@@ -1,0 +1,75 @@
+#Fst Popoolation2
+#https://sourceforge.net/p/popoolation2/wiki/Tutorial/
+
+1. download all .bam files
+2. convert to .sam files 
+    samtools view -h -o out.sam in.bam
+3. merge .sam files by population 
+    java -jar /usr/local/src/picard-tools-2.1.0/picard.jar MergeSamFiles I=infile.bam I=infile2.bam O=outfile.sam
+4. remove sam files (very large)
+5.#Remove ambiguously mapped reads
+samtools view -q 20 -bS social_merged_files.sam | samtools sort - pop1_social
+
+samtools view -q 20 -bS solitary_merged_files.sam | samtools sort - pop2_solitary
+
+6.#Create a synchronized file
+    #Synchronized files are the main input files for PoPoolation2. They basically contain the allele frequencies for every population at every base in the reference genome in a concise format. Note that the synchronized file format contains the allele frequencies after filtering for base quality.
+
+samtools mpileup -B map/pop1_social.bam map/pop2_solitary.bam > p1_p2.mpileup
+
+perl /home/arshad/progs/popoolation2_1201/mpileup2sync.pl --fastq-type sanger --min-qual 20 --input p1_p2.mpileup --output p1_p2.sync
+
+ #Synchronizing the mpileup file is quite time consuming. To remove this bottleneck we implemented 'mpileup2sync' in Java multi-threading which is about 78x faster as the implementation in perl.
+
+java -ea -Xmx7g -jar /home/arshad/progs/popoolation2_1201/mpileup2sync.jar --input p1_p2.mpileup --output p1_p2_java.sync --fastq-type sanger --min-qual 20 --threads 8
+
+    #Calculate allele frequency differences
+    #The exact allele frequency differences may be computed as follows:
+
+perl /home/arshad/progs/popoolation2_1201/snp-frequency-diff.pl --input p1_p2.sync --output-prefix p1_p2 --min-count 6 --min-coverage 50 --max-cover
+
+    #This script creates two output files having two different extensions:
+    #_rc: this file contains the major and minor alleles for every SNP in a concise format
+    #_pwc: this file contains the differences in allele frequencies for every pairwise comparision of the populations present in the synchronized file 
+    #For details see the man pages of the script
+
+    #Fst-values: measure differentiation between populations
+    #Calculate Fst for every SNP
+perl /home/arshad/progs/popoolation2_1201/fst-sliding.pl --input p1_p2.sync --output p1_p2.fst --suppress-noninformative --min-count 6 --min-coverage
+
+    #Calculate Fst values using a sliding window approach
+perl /home/arshad/progs/popoolation2_1201/fst-sliding.pl --input p1_p2.sync --output p1_p2_w500.fst --min-count 6 --min-coverage 50 --max-coverage 200 --min-covered-fraction 1 --window-size 500 --step-size 500 --pool-size 500
+
+    #Load Fst-values into IGV
+    #First index the two bam files
+samtools index map/pop1.bam
+samtools index map/pop2.bam
+    
+    #Than convert the file containing the Fst-values into the .igv format
+perl /home/arshad/progs/popoolation2_1201/export/pwc2igv.pl --input p1_p2.fst --output p1_p2.igv
+
+    #Finally load the results into the IGV
+    #Start IGV
+    #Import Genome -> Load the fasta file: 2R.fasta
+    #Load the two .bam files
+    #Load the .igv file containing the Fst values
+
+
+    #Fisher's Exact Test: estimate the significance of allele frequency differences
+    #The Fishers exact test can be used to test whether any differences in allele frequencies are statistically significant. At low coverages the absolute changes of allele frequencies or the Fst values may be strongly influenced by sampling effects, therefore the Fishers exact test may be used to identify significant changes in allele frequency.
+
+perl /home/arshad/progs/popoolation2_1201/fisher-test.pl --input p1_p2.sync --output p1_p2.fet --min-count 6 --min-coverage 50 --max-coverage 200 --suppress-noninformative
+
+    #Note that this script provides -log10(P-value) as output.
+
+    #Load the Fisher's exact test results into the IGV
+    #First convert the Fisher's exact test results into the .igv file format:
+perl <popoolation2-path>/export/pwc2igv.pl --input p1_p2.fet --output p1_p2_fet.igv
+
+#Calculate Fst for genes
+#Download the annotated exons for the first 1mio bp of chromosome 2R http://popoolation2.googlecode.com/files/2R_exons.gtf
+#Convert the synchronized file into a gene-based synchronized file
+perl <popoolation2-path>/create-genewise-sync.pl --input p1_p2.sync --gtf 2R_exons.gtf --output p1_p2_genes.sync
+
+#Calculate the Fst for every gene:
+perl <popoolation2-path>/fst-sliding.pl --min-count 6 --min-coverage 50 --max-coverage 200 --pool-size 500 --min-covered-fraction 0.0 --window-size 1000000 --step-size 1000000 --input p1_p2_genes.sync --output p1_p2_genewise.fst

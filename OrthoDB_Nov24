@@ -1,0 +1,113 @@
+awk -F' ' '$2=="156304_0"' odb11v0_genes_2.tab > odb11v0_genes_2_ccalc.tab
+
+cut -f 1-4 odb11v0_genes_2_ccalc.tab > odb11v0_genes_2_ccalc_2.tab
+
+join -1 2 -2 1 <(sort odb11v0_OG2genes.tab  -k2b,2) <(sort odb11v0_genes_2_ccalc_2.tab) > odb11v0_genes_2_OG2genes.tab
+
+
+OrthoDB_Bash_Python
+# Nov 24
+#Created 07/04/2020
+
+#GOAL: Need to know which taxa honey bee orthologs 'match' with
+
+
+#odb10v1_species.tab
+
+
+#Isolate the C. calcarata Genes
+sed '/\t156304_0\t/!d' odb11v0_genes_2.tab > ceratina_genes.txt 
+
+#Isolate the Apis taxa ID and the Universal gene id
+sed '/156304_0/!d' odb11v0_OG2genes.tab > UniversalGeneName.txt
+
+#Which taxa share a ortholog with C. calc
+cut -f 1 UniversalGeneName.txt > UGID.txt
+grep -wFf UGID.txt odb11v0_OG2genes.tab | sort -k 1,1 > UGID2TaxaID.txt 
+
+#Goal: Associate each taxa with orthologs to apis with their taxonomic level 
+#I need to know which levels are associated with each gene, and how many individuals at each level. For example, Two apis species, would both be involved at each level, but both originate from level Apis, therefor an apis level gene. 
+
+awk 'BEGIN {FS="\t"; OFS="\t"}{print $1,$2,$2}' UGID2TaxaID.txt | sed 's/:/\t/2' | cut -f 1-3 | sort -k 3,3 > Temp1.txt
+
+#sort, expand last column (Sed), take columns 2 and 4 to the end, cut off last column, tab separate 
+sort -k 2,2 odb11v0_level2species.tab | sed 's/{//; s/}//; s/,/\t/g' | cut -f 2,4- | awk 'NF{NF-=1};1' | sed 's/ /\t/g' > Temp2.txt
+
+join -t $'\t' -1 1 -2 3 -o 2.1,2.3,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,1.10,1.11 Temp2.txt Temp1.txt | sort -k 1,1 > UnisersalLevelsTaxa.txt
+
+join -t $'\t' -1 1 -2 1 -o 1.2,2.2,2.3,2.4,2.5,2.6,2.7,2.8,2.9,2.10,2.11,2.12 UniversalGeneName.txt UnisersalLevelsTaxa.txt | sort -k 1,1| sort -u > CeratinaGeneID.TaxaLevels.txt
+#I think this is the correct data 
+
+#grep -i '156304_0' UnisersalLevelsTaxa.txt > ccalc_test.txt
+
+#Stack the data
+#replace CeratinaGeneID.TaxaLevels.txt with ccalc_test.txt
+R
+setwd('/data3/dova_nanuq_raw_data/orthoDB')
+df = read.table(file='CeratinaGeneID.TaxaLevels.txt', header=F, sep='\t', quote="")
+
+sub1 = df[c("V1", "V3")]
+names(sub1) = c("Gene", "Level")
+sub2 = df[c("V1", "V4")]
+names(sub2) = c("Gene", "Level")
+sub3 = df[c("V1", "V5")]
+names(sub3) = c("Gene", "Level")
+sub4 = df[c("V1", "V6")]
+names(sub4) = c("Gene", "Level")
+sub5 = df[c("V1", "V7")]
+names(sub5) = c("Gene", "Level")
+sub6 = df[c("V1", "V8")]
+names(sub6) = c("Gene", "Level")
+sub7 = df[c("V1", "V9")]
+names(sub7) = c("Gene", "Level")
+sub8 = df[c("V1", "V10")]
+names(sub8) = c("Gene", "Level")
+sub9 = df[c("V1", "V11")]
+names(sub9) = c("Gene", "Level")
+sub10 = df[c("V1", "V12")]
+names(sub10) = c("Gene", "Level")
+
+subdf = rbind(sub1, sub2, sub3, sub4, sub5, sub6, sub7, sub8, sub9, sub10)
+subdf$Count = 1
+
+agg = aggregate(Count ~ Gene + Level, data=subdf, length)
+
+write.table(agg, "AggregatedLevels.txt", sep='\t', quote=F, row.names=F)
+
+#Apis is built on these levels 2759,33208,6656,6960,50557,33392,7399,7434,34735
+
+#Bash
+awk '{ if ($2 == 2759 || $2 == 33208 || $2 == 6656 || $2 == 6960 || $2 == 50557 || $2 == 33392 || $2 == 7399 || $2 == 7434 || $2 == 34735) print $0 }' AggregatedLevels.txt > CeratinaLevels.txt
+
+#Reorganize the dataset
+R
+setwd('/data3/dova_nanuq_raw_data/orthoDB')
+df = read.table(file='CeratinaLevels.txt', header=F)
+library(reshape2)
+df2 = dcast(df, V1 ~ V2)
+#*df2 = dcast(df, V1 ~ V2)
+#Using V3 as value column: use value.var to override.
+
+write.table(df2, "CeratinaAggregateLevelsFinal.txt", sep='\t', quote=F, row.names=F)
+
+
+#Reorganize the dataframe by descending level
+awk 'BEGIN {IFS = OFS = "\t"}{print $1,$2,$7,$3,$4,$10,$8,$5,$6,$9}' CeratinaAggregateLevelsFinal.txt | sed '1d' | sed '1iGene\tEukaryota\tMetazoa\tArthropoda\tHexpoda\tInsecta\tHolometabola\tHymenoptera\tAculeata\tApoidea' > Reorganized.txt
+
+#Categorize the data
+awk 'BEGIN {IFS = OFS = "\t"}{if ($2 == $3 && $2 != $4 && $2 != $5 && $2 != $6 && $2 != $7 && $2 != $8 && $2 != $9 && $2 != $10){print $0, "Metazoa"} else if ($2 == $3 && $2 == $4 && $2 != $5 && $2 != $6 && $2 != $7 && $2 != $8 && $2 != $9 && $2 != $10){print $0, "Arthropoda"} else if ($2 == $3 && $2 == $4 && $2 == $5 && $2 != $6 && $2 != $7 && $2 != $8 && $2 != $9 && $2 != $10){print $0, "Hexpoda"} else if ($2 == $3 && $2 == $4 && $2 == $5 && $2 == $6 && $2 != $7 && $2 != $8 && $2 != $9 && $2 != $10){print $0, "Insecta"} else if ($2 == $3 && $2 == $4 && $2 == $5 && $2 == $6 && $2 == $7 && $2 != $8 && $2 != $9 && $2 != $10){print $0, "Holometabola"} else if ($2 == $3 && $2 == $4 && $2 == $5 && $2 == $6 && $2 == $7 && $2 == $8 && $2 != $9 && $2 != $10){print $0, "Hymenoptera"} else if ($2 == $3 && $2 == $4 && $2 == $5 && $2 == $6 && $2 == $7 && $2 == $8 && $2 == $9 && $2 != $10){print $0, "Aculeata"} else if ($2 == $3 && $2 == $4 && $2 == $5 && $2 == $6 && $2 == $7 && $2 == $8 && $2 == $9 && $2 == $10){print $0, "Apoidea"} else {print $0, "Eukaryota"}}' Reorganized.txt | sed '1d' | sed '1iGene\tEukaryota\tMetazoa\tArthropoda\tHexpoda\tInsecta\tHolometabola\tHymenoptera\tAculeata\tApoidea\tCategory' > Categorize.txt
+
+#Convert the orthoDB gene names to GB names 
+cut -f 1,6 ceratina_genes.txt | sed 's/;/\t;\t/g' | awk 'BEGIN {IFS = OFS = "\t"} {for (i=2;i<=NF;i++){if ($i ~ ";"){$i="$"$1}} print}'| sed 's/\$/\n/g' > Universal2CeratinaConversions.txt 
+
+#Merge
+setwd('/data3/data3/dova_nanuq_raw_data/orthoDB')
+df = read.table(file='Categorize.txt', header=T)
+uni = read.table(file='Universal2CeratinaConversions.txt', header=F, sep='\t', quote="")
+names(uni) = c("Gene", "CeratinaGB")
+
+m1 = merge(uni, df, by="Gene", all=T)
+
+write.table(m1, "Ceratina.OrthoGenes.txt", sep='\t', quote=F, row.names=F)
+
+#NB: In the final database AMel.OrthoGenes.txt, there are some genes that do not have a GB counterpart, or do not have ortholog data. 

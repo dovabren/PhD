@@ -1,0 +1,57 @@
+ grep ">" /data3/dova_nanuq_raw_data/GCF_001652005.1_ASM165200v1_translated_cds.faa > /data3/dova_nanuq_raw_data/ASM165200v1_translated_cds_firstline.faa
+  790  head /data3/dova_nanuq_raw_data/ASM165200v1_translated_cds_firstline.faa
+  791  cd /data3/dova_nanuq_raw_data/
+  792  echo $1 $2 ASM165200v1_translated_cds_firstline.faa > ASM165200v1_translated_cds_firstline_2.faa
+  793  head ASM165200v1_translated_cds_firstline_2.faa
+  794  cut -d' ' -f1,f2 ASM165200v1_translated_cds_firstline.faa > ASM165200v1_translated_cds_firstline_2.faa
+  795  cut -d' ' -f1 ASM165200v1_translated_cds_firstline.faa > ASM165200v1_translated_cds_firstline_2.faa
+  796  head ASM165200v1_translated_cds_firstline_2.faa
+  797  cut -d' ' -f2 ASM165200v1_translated_cds_firstline.faa > ASM165200v1_translated_cds_firstline_3.faa
+  798  paste -d' ' ASM165200v1_translated_cds_firstline_2.faa ASM165200v1_translated_cds_firstline_3.faa > ASM165200v1_translated_cds_firstline_4.faa
+  799  head ASM165200v1_translated_cds_firstline_4.faa
+  800  head -50 ASM165200v1_translated_cds_firstline_4.faa
+  801  head ASM165200v1_translated_cds_firstline_4.faa
+  802  wc -l ASM165200v1_translated_cds_firstline_4.faa
+  803  head background_FB_aug17.txt
+  804  head target_top5_FB_aug17.txt
+  805  head dmel-all-translation-r6.40.fasta
+  806  grep ">" dmel-all-translation-r6.40.fasta > dmel-all-translation-r6.40_firstline.fasta
+  807  head dmel-all-translation-r6.40_firstline.fasta
+  808  cut -d' ' -f1 ASM165200v1_translated_cds_firstline.faa > ASM165200v1_translated_cds_firstline_2.faa
+  809  cut -d' ' -f6 ASM165200v1_translated_cds_firstline.faa > ASM165200v1_translated_cds_firstline_3.faa
+  810  head ASM165200v1_translated_cds_firstline_3.faa
+  811  cut -d';' -f5 ASM165200v1_translated_cds_firstline.faa > ASM165200v1_translated_cds_firstline_3.faa
+  812  head ASM165200v1_translated_cds_firstline_3.faa
+  813  cut -d' ' -f6 ASM165200v1_translated_cds_firstline.faa > ASM165200v1_translated_cds_firstline_3.faa
+  814  cut -d' ' -f1 ASM165200v1_translated_cds_firstline.faa > ASM165200v1_translated_cds_firstline_2.faa
+  
+  
+  815  cut -d' ' -f1 dmel-all-translation-r6.40_firstline.fasta > dmel-all-translation-r6.40_firstline2.fasta
+  816  head dmel-all-translation-r6.40_firstline2.fasta
+  817  cut -d';' -f6 dmel-all-translation-r6.40_firstline.fasta > dmel-all-translation-r6.40_firstline3.fasta
+  818  head dmel-all-translation-r6.40_firstline3.fasta
+  819  head dmel-all-translation-r6.40_firstline.fasta
+  820  cut -d';' -f5 dmel-all-translation-r6.40_firstline.fasta > dmel-all-translation-r6.40_firstline3.fasta
+  821  head dmel-all-translation-r6.40_firstline3.fasta
+  822  cut -d'=' -f2 dmel-all-translation-r6.40_firstline3.fasta > dmel-all-translation-r6.40_firstline3.fasta
+  823  head dmel-all-translation-r6.40_firstline3.fasta
+  824  cut -d';' -f5 dmel-all-translation-r6.40_firstline.fasta > dmel-all-translation-r6.40_firstline3.fasta
+  825  cut -d'=' -f2 dmel-all-translation-r6.40_firstline3.fasta > dmel-all-translation-r6.40_firstline4.fasta
+  826  head dmel-all-translation-r6.40_firstline4.fasta
+  827  cut -d',' -f1 dmel-all-translation-r6.40_firstline4.fasta > dmel-all-translation-r6.40_firstline5.fasta
+  828  paste -d' ' dmel-all-translation-r6.40_firstline2.fasta dmel-all-translation-r6.40_firstline5.fasta > dmel-all-translation-r6.40_firstline_final.fasta
+  829  head dmel-all-translation-r6.40_firstline_final.fasta
+  830  dmel-all-translation-r6.40_firstline_final.fasta > dmel-all-translation-r6.40_firstline_final.txt
+  831  mv dmel-all-translation-r6.40_firstline_final.fasta > dmel-all-translation-r6.40_firstline_final.txt
+  832  mv dmel-all-translation-r6.40_firstline_final.fasta  dmel-all-translation-r6.40_firstline_final.txt
+  833  head dmel-all-translation-r6.40_firstline_final.txt 
+  834  sed 's/^.//' dmel-all-translation-r6.40_firstline_final.txt > dmel-all-translation-r6.40_firstline_final2.txt 
+  835  head dmel-all-translation-r6.40_firstline_final2.txt 
+
+
+
+
+blastp -query dmel-all-translation-r6.40.fasta -db /data3/dova_nanuq_raw_data/snpEff/data/ASM165200v1/protein.fa -out ccalc_dmel_protein_blast_recip_aug16.txt
+
+
+blastp -outfmt 7 -db /data3/dova_nanuq_raw_data/snpEff/data/ASM165200v1/protein.fa -query dmel-all-translation-r6.40.fasta -out ccalc_dmel_blastp_trial_rev.txt

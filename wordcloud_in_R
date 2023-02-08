@@ -1,0 +1,18 @@
+library(wordcloud)
+library(RColorBrewer)
+library(wordcloud2)
+library(tm)
+library("readxl")
+#Create a vector containing only the text
+text <- read_excel("word_cloud_david_top5.xlsx")
+
+text <- david$text
+# Create a corpus  
+docs <- Corpus(VectorSource(text))
+
+docs <- docs %>%
+  tm_map(removeNumbers) %>%
+  tm_map(removePunctuation) %>%
+  tm_map(stripWhitespace)
+docs <- tm_map(docs, content_transformer(tolower))
+docs <- tm_map(docs, removeWords, stopwords("english"))

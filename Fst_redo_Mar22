@@ -1,0 +1,50 @@
+library(devtools)
+library("adegenet")
+library('vcfR') #genetic_diff function  
+#library(hierfstat)
+library(poppr)
+vcf <- read.vcfR("Soc_Sol_filter_3_025.vcf")
+
+#METHOD 1 -USE THIS 
+#define populations (check if this is correct)
+#sign in with -Y
+x11()
+myPops <- as.factor(rep(c("soc", "soc", "soc", "soc","soc", "soc","soc", "soc", "soc", "soc", "sol", "sol", "sol", "sol", "sol", "sol","sol", "sol", "sol", "sol")))
+myDiff <- genetic_diff(vcf, myPops, method="nei")
+colMeans(myDiff[,c(3:8,11)], na.rm = TRUE)
+hist(myDiff$Gst, xlab = expression(italic("G"["ST"])), col='skyblue', breaks = seq(0, 1, by = 0.01))
+
+hist(myDiff$Gprimest, xlab = expression(italic("G'"["ST"])), col='skyblue', breaks = seq(0, 1, by = 0.01))
+
+write.csv(myDiff, "Gst_mar22_genetic_diff.csv", row.names = FALSE)
+
+#random sample of SNPs, randomize labels and perform PCA 
+
+
+
+
+
+#METHOD 2- load all in method 1 before trying method 2
+
+#add in @pop slot 
+sample_name <- c("cSoc_01", "cSoc_02", "cSoc_03", "cSoc_04", "cSoc_05", "cSoc_06", "cSoc_07", "cSoc_08", "cSoc_09", "cSoc_10", "cSol_01", "cSol_02", "cSol_03", "cSol_04", "cSol_05", "cSol_06", "cSol_07", "cSol_08", "cSol_09", "cSol_10")
+
+pops_list <- c("soc", "soc", "soc", "soc","soc", "soc","soc", "soc", "soc", "soc", "sol", "sol", "sol", "sol", "sol", "sol","sol", "sol", "sol", "sol")
+
+df <- data.frame(sample_name, pops_list)  
+df
+
+my_genind <-vcfR2genind(vcf)
+#class(my_genind)
+is.genind(my_genind)
+strata(my_genind) <- df
+
+setPop(my_genind) <- ~pops_list 
+
+#define the population 
+genind2hierfstat(my_genind,pop=NULL)
+
+bs.ss <- basic.stats(my_genind)
+head(bs.ss)
+
+boxplot(bs.ss)

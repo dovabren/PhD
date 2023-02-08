@@ -1,0 +1,29 @@
+##OrthoFinder - run on local machine 
+
+#installation instructions: https://davidemms.github.io/orthofinder_tutorials/alternative-ways-of-getting-OrthoFinder.html
+
+
+#OrthoFinder tutorial
+https://davidemms.github.io/orthofinder_tutorials/running-an-example-orthofinder-analysis.html
+
+#files used: in cd proteomes
+GCF_000001215.4_Release_6_plus_ISO1_MT_protein.faa	GCF_001652005.1_ASM165200v1_translated_cds.faa
+
+#only use longest transcript 
+for f in *faa ; do python ~/orthofinder_tutorial/OrthoFinder/tools/primary_transcript.py $f ; done
+
+#run orthofinder
+orthofinder -f primary_transcripts/
+
+
+#results: 
+OrthoFinder assigned 20327 genes (80.8% of total) to 7610 orthogroups. Fifty percent of all genes were in orthogroups with 2 or more genes (G50 was 2) and were contained in the largest 3738 orthogroups (O50 was 3738). There were 6805 orthogroups with all species present and 5260 of these consisted entirely of single-copy genes
+
+
+CITATION:
+ When publishing work that uses OrthoFinder please cite:
+ Emms D.M. & Kelly S. (2019), Genome Biology 20:238
+
+ If you use the species tree in your work then please also cite:
+ Emms D.M. & Kelly S. (2017), MBE 34(12): 3267-3278
+ Emms D.M. & Kelly S. (2018), bioRxiv https://doi.org/10.1101/267914

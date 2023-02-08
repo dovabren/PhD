@@ -1,0 +1,31 @@
+#Nov 2,2022
+#blastp 
+#database = drosophila
+#query = ceratina 
+
+
+
+
+makeblastdb -in /data3/dova_nanuq_raw_data/GCF_000001215.4_Release_6_plus_ISO1_MT_protein.faa -dbtype prot
+
+blastp -query GCF_001652005.1_ASM165200v1_translated_cds.faa -db /data3/dova_nanuq_raw_data/GCF_000001215.4_Release_6_plus_ISO1_MT_protein.faa -out dmel_ccalc_protein_blast_nov2_22.txt -outfmt 7 
+
+
+
+
+#protein blast for droso against droso
+
+dmel-all-translation-r6.40.fasta 
+GCF_000001215.4_Release_6_plus_ISO1_MT_protein.faa
+
+
+blastp -query dmel-all-translation-r6.40.fasta -db /data3/dova_nanuq_raw_data/GCF_000001215.4_Release_6_plus_ISO1_MT_protein.faa -out dmel_NP_FBpp_blast_nov3_22.txt -outfmt 7
+
+#reciprocal best blast match - Nov 8 ,2022
+
+#find list of all best hits
+
+
+makeblastdb -in GCF_001652005.1_ASM165200v1_translated_cds.faa
+
+blastp -query /data3/dova_nanuq_raw_data/GCF_000001215.4_Release_6_plus_ISO1_MT_protein.faa -db ##list of all ceratina genes with best blast hits## -out best_blast_hits_dmel_ccalc_nov_22.txt -outfmt 7 

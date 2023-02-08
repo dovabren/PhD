@@ -1,0 +1,59 @@
+samtools faidx GCF_000001215.4_Release_6_plus_ISO1_MT_genomic.fna
+
+formatdb -i GCF_000001215.4_Release_6_plus_ISO1_MT_genomic.fna -p F -o F
+
+samtools faidx /data3/ASM165200v1_rename.fa 
+
+formatdb -i /data3/ASM165200v1_rename.fa -p F -o F
+
+
+blastn -query snpEff/data/genomes/ASM165200v1_refseq.fa -db GCF_000001215.4_Release_6_plus_ISO1_MT_genomic.fna -out ccalc_dmel_aug11.txt -outfmt 7 -evalue 1e-00 -num_threads 8 -max_target_seqs 3
+
+
+
+
+
+
+samtools faidx /data3/dova_nanuq_raw_data/snpEff/data/ASM165200v1/GFF_NCBI_download/sequence_NCBI.fa
+
+formatdb -i /data3/dova_nanuq_raw_data/snpEff/data/ASM165200v1/GFF_NCBI_download/sequence_NCBI.fa  -p F -o F
+
+
+blastn -query /data3/dova_nanuq_raw_data/GCF_000001215.4_Release_6_plus_ISO1_MT_genomic.fna -db /data3/dova_nanuq_raw_data/snpEff/data/ASM165200v1/GFF_NCBI_download/sequence_NCBI.fa -out ccalc_gene_dmel_gene_may2022.txt -outfmt 7 -evalue 1e-00 -num_threads 8 -max_target_seqs 3
+
+samtools faidx /data3/dova_nanuq_raw_data/snpEff/data/ASM165200v1/protein.fa 
+
+formatdb -i /data3/dova_nanuq_raw_data/snpEff/data/ASM165200v1/protein.fa  -p F -o F
+
+blastx -query /data3/dova_nanuq_raw_data/snpEff/data/ASM165200v1/sequence2_fixed.fa -db /data3/dova_nanuq_raw_data/snpEff/data/ASM165200v1/protein.fa  -out ccalc_NP_may2022.txt -outfmt 7 -evalue 1e-00 -num_threads 8 -max_target_seqs 3
+
+
+
+## ccalc names to XP ceratina protein name
+samtools faidx /data3/dova_nanuq_raw_data/snpEff/data/ASM165200v1/protein.fa 
+
+formatdb -i /data3/dova_nanuq_raw_data/snpEff/data/ASM165200v1/protein.fa  -p F -o F
+
+blastx -query /data3/dova_nanuq_raw_data/snpEff/data/ASM165200v1/sequence2_fixed.fa -db /data3/dova_nanuq_raw_data/snpEff/data/ASM165200v1/protein.fa  -out ccalc_NP_may2022.txt -outfmt 7 -evalue 1e-00 -num_threads 8 -max_target_seqs 3
+
+#ccalc names to dmel protein 
+samtools faidx /data3/dova_nanuq_raw_data/GCF_000001215.4_Release_6_plus_ISO1_MT_protein.faa 
+
+formatdb -i /data3/dova_nanuq_raw_data/GCF_000001215.4_Release_6_plus_ISO1_MT_protein.faa -p F -o F
+
+blastx -query /data3/dova_nanuq_raw_data/snpEff/data/ASM165200v1/sequence2_fixed.fa -db /data3/dova_nanuq_raw_data/GCF_000001215.4_Release_6_plus_ISO1_MT_protein.faa -out ccalc_dmel_P_may2022.txt -outfmt 7 -evalue 1e-00 -num_threads 8 -max_target_seqs 3
+
+
+# june 13, 2022
+
+samtools faidx GCF_001652005.1_ASM165200v1_translated_cds.faa
+
+formatdb -i GCF_001652005.1_ASM165200v1_translated_cds.faa -p F -o F
+
+blastx -query /data3/dova_nanuq_raw_data/snpEff/data/ASM165200v1/sequence2_fixed.fa -db GCF_001652005.1_ASM165200v1_translated_cds.faa -out ccalc_NW_LOC_june2022.txt -outfmt 7 -evalue 1e-00 -num_threads 8 -max_target_seqs 3
+
+
+
+#aug 8, 2022
+#drosophila and NM/XM 
+
