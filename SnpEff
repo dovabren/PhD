@@ -1,0 +1,896 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[3]:
+
+
+#merge Fst results and snpEff to get exact genes that have high Fst 
+import pandas as pd
+import seaborn as sns
+import numpy as np
+pd.set_option('display.max_columns', None)
+pd.set_option('display.max_rows', None)
+
+fst = pd.read_csv('calc_and_other_ceratina_MAY2_VCFTOOLS_fst.weir.fst', sep='\t')
+fst.columns = ['CHROM', 'POS','Fst']
+#fst[['new','Fst_pairwise']] = fst['Fst_pairwise'].str.split('=',expand=True)
+fst.head()
+
+
+# In[4]:
+
+
+len(fst)
+
+
+# In[5]:
+
+
+fst['Fst'] = fst['Fst'].apply(lambda x: 0 if x < 0 else x)
+
+
+# In[6]:
+
+
+
+fst['Fst'].quantile(0.95),fst['Fst'].quantile(0.99)
+
+
+# In[7]:
+
+
+fst['CHROM'] = fst['CHROM'].astype(str)
+fst['POS'] = fst['POS'].astype(str)
+fst['CHROM_POS'] = fst['CHROM'] +'_'+ fst['POS']
+fst.head()
+
+
+# # import SnpEff
+
+# In[8]:
+
+
+#old- Soc_Sol_filter_3_025_ann.vcf
+#new using upstream -ud 1000 Soc_Sol_filter_3_025_ann_1kb.vcf
+
+snpeff = pd.read_csv('/data3/dova_nanuq_raw_data/calc_and_other_ceratina_filter3.ann.vcf',  sep='\t', header=None, comment='#')
+#pd.set_option('display.max_rows', 100)
+snpeff.columns = ["CHROM", "POS",'ID','REF','ALT','QUAL','FILTER','INFO','FORMAT','cSoc_01','cSoc_02','cSoc_03','cSoc_04','cSoc_05','cSoc_06','cSoc_07','cSoc_08','cSoc_09','cSoc_10','cSol_01','cSol_02','cSol_03','cSol_04','cSol_05','cSol_06','cSol_07','cSol_08','cSol_09','cSol_10','stre_01','stre_02']
+snpeff.head()
+
+
+# In[9]:
+
+
+snpeff['CHROM'] = snpeff['CHROM'].astype(str)
+snpeff['POS'] = snpeff['POS'].astype(str)
+snpeff['CHROM_POS'] = snpeff['CHROM'] +'_'+ snpeff['POS']
+snpeff.head()
+
+
+# In[21]:
+
+
+snpeff_fst = pd.merge(snpeff, fst, how='inner', on='CHROM_POS')
+
+
+# In[22]:
+
+
+len(snpeff), len(fst), len(snpeff_fst)
+
+
+# In[23]:
+
+
+snpeff_fst.drop(['CHROM_x','CHROM_y','POS_x','POS_y','REF','ALT','ID','FORMAT','FILTER','QUAL',
+       'cSoc_01', 'cSoc_02', 'cSoc_03', 'cSoc_04', 'cSoc_05', 'cSoc_06',
+       'cSoc_07', 'cSoc_08', 'cSoc_09', 'cSoc_10', 'cSol_01', 'cSol_02',
+       'cSol_03', 'cSol_04', 'cSol_05', 'cSol_06', 'cSol_07', 'cSol_08',
+       'cSol_09', 'cSol_10','stre_01','stre_02'],axis=1,inplace=True)
+snpeff_fst.head()
+
+
+# # snpeff extract effect by type
+
+# In[24]:
+
+
+snpeff_fst['attribute'] = snpeff_fst['INFO'].str.extract(r'(ANN[^]]+)')
+snpeff_fst.head()
+
+
+# In[25]:
+
+
+snpeff_fst['attribute'] = snpeff_fst['attribute'].str.split('|').str[1]
+snpeff_fst.head()
+
+
+# In[26]:
+
+
+
+snpeff_fst['attribute2'] = snpeff_fst['attribute'].replace({
+    '3_prime_UTR_variant':'downstream', 
+    '5_prime_UTR_premature_start_codon_gain_variant':'upstream',
+    '5_prime_UTR_variant':'upstream', 
+    'downstream_gene_variant':'downstream',
+    'upstream_gene_variant':'upstream',
+    'initiator_codon_variant':'exon',
+    'initiator_codon_variant':'exon',
+    'intron_variant':'intron',
+        'missense_variant':'exon',
+        'missense_variant&splice_region_variant':'exon',
+        'non_coding_transcript_variant':'intron',    
+        'splice_acceptor_variant&intron_variant':'intron',
+        'splice_donor_variant&intron_variant':'intron',
+        'splice_region_variant':'exon',
+        'splice_region_variant&intron_variant':'intron',
+        'splice_region_variant&non_coding_transcript_exon_variant':'exon',    
+        'splice_region_variant&stop_retained_variant':'exon',
+        'splice_region_variant&synonymous_variant':'exon',
+        'start_lost':'exon',
+        'start_lost&splice_region_variant':'exon',
+        'stop_gained':'exon',
+        'stop_gained&splice_region_variant':'exon',
+        'stop_lost':'exon',
+        'stop_lost&splice_region_variant':'exon',
+            'stop_retained_variant':'exon',
+            'synonymous_variant':'exon',
+        'non_coding_transcript_exon_variant':'exon',
+    'intergenic_region': 'intergenic',
+    'intragenic_region' : 'intragenic',
+'initiator_codon_variant&splice_region_variant':'exon', 
+'splice_acceptor_variant&splice_donor_variant&intron_variant':'intron'
+})
+
+
+# In[27]:
+
+
+snpeff_fst['attribute2'].value_counts()
+
+
+# In[28]:
+
+
+snpeff_fst.tail()
+
+
+# In[36]:
+
+
+snpeff_fs
+snpeff_fst_top5 = snpeff_fst[snpeff_fst['Fst'] >= 0.12]
+snpeff_fst_top1 = snpeff_fst[snpeff_fst['Fst'] >= 0.28]
+
+
+# In[29]:
+
+
+len(snpeff_fst)
+
+
+# In[30]:
+
+
+import matplotlib.pyplot as plt
+#from brokenaxes import brokenaxes
+snpeff_fst['attribute2'].value_counts().plot(kind = 'bar')
+#ha is horizontal alignment 
+plt.xticks(rotation=45, ha='right')
+#plt.tight_layout()
+#plt.savefig('SnpEff_dist_all_may2.png', dpi=400)
+plt.show
+
+
+# In[ ]:
+
+
+snpeff_fs
+snpeff_fst_top5 = snpeff_fst[snpeff_fst['Fst'] >= 0.12]
+snpeff_fst_top1 = snpeff_fst[snpeff_fst['Fst'] >= 0.28]
+
+
+# In[98]:
+
+
+import matplotlib.pyplot as plt
+
+pie_plot = snpeff_fst['attribute2'].value_counts()
+pie_plot = pie_plot.reset_index()
+#pie_plot_top5.columns = ['effects','count']
+#pie_plot_top5
+pie_plot.head()
+
+
+pie_plot_top5 = snpeff_fst_top5['attribute2'].value_counts()
+pie_plot_top5 = pie_plot_top5.reset_index()
+pie_plot.columns = ['attribute','count_all']
+pie_plot_top5.columns = ['attribute','count_top5']
+pie_plot_top1.columns = ['attribute','count_top1']
+#pie_plot_top5
+pie_plot_top5.head()
+
+
+# In[75]:
+
+
+pie_plot.head()
+
+
+# In[112]:
+
+
+pie_plot_merge = pd.merge(pie_plot, pie_plot_top5, how='inner',on=['attribute'])
+pie_plot_merge_2 = pd.merge(pie_plot,pie_plot_top1, how='inner',on=['attribute'])
+
+
+# In[140]:
+
+
+print(pie_plot_merge_2)
+
+
+# # G test 
+
+# In[144]:
+
+
+pie_plot_merge_2.dtypes
+
+
+# In[167]:
+
+
+from scipy.stats import chi2_contingency
+
+results = []
+
+# Perform G-test of independence for each category
+for _, row in pie_plot_merge.iterrows():
+    category = row["attribute"]
+    count_all = row["count_all"]
+    count_top5 = row["count_top5"]
+
+    # Create contingency table
+    observed = [[count_all, count_top5],
+                [sum(pie_plot_merge["count_all"]) - count_all, sum(pie_plot_merge["count_top5"]) - count_top5]]
+
+    # Perform G-test of independence
+    g_stat, p_value, dof, expected = chi2_contingency(observed, lambda_="log-likelihood")
+
+    # Store the results for the category
+    result = {
+        "Category": category,
+        "G-test statistic_all_v_top5": g_stat,
+        "P-value_all_v_top5": p_value,
+        "Degrees of freedom": dof,
+        "Expected frequencies_all_v_top5": expected
+    }
+    results.append(result)
+
+# Create a DataFrame from the results
+results_df = pd.DataFrame(results)
+results_df
+
+
+# In[149]:
+
+
+# g test for top 5
+
+from scipy.stats import chi2_contingency
+results_df = pd.DataFrame(columns=["Category", "G-test statistic_all_v_top5", "P-value_all_v_top5", "Degrees of freedom", "Expected frequencies_all_v_top5"])
+
+# Perform G-test of independence for each category
+for _, row in pie_plot_merge.iterrows():
+    category = row["attribute"]
+    count_all = row["count_all"]
+    count_top5 = row["count_top5"]
+
+    # Create contingency table
+    observed = [[count_all, count_top5],
+                [sum(pie_plot_merge["count_all"]) - count_all, sum(pie_plot_merge["count_top5"]) - count_top5]]
+
+    # Perform G-test of independence
+    g_stat, p_value, dof, expected = chi2_contingency(observed, lambda_="log-likelihood")
+    results_df = results_df.append({
+        "Category": category,
+        "G-test statistic_all_v_top5": g_stat,
+        "P-value_all_v_top5": p_value,
+        "Degrees of freedom": dof,
+        "Expected frequencies_all_v_top5": expected
+    }, ignore_index=True)
+
+#results_df.to_csv('ch1_g_test_snpeff_top5.txt',sep='\t',index=False)
+
+
+# In[155]:
+
+
+from scipy.stats import chi2_contingency
+
+results_df = pd.DataFrame(columns=["Category", "G-test statistic_all_v_top5", "P-value_all_v_top5", "Degrees of freedom", "Expected frequencies_all_v_top5"])
+
+# Perform G-test of independence for each category
+for _, row in pie_plot_merge.iterrows():
+    category = row["attribute"]
+    count_all = row["count_all"]
+    count_top5 = row["count_top5"]
+
+    # Create contingency table
+    category_mask = pie_plot_merge["attribute"] == category
+    count_all_category = pie_plot_merge.loc[category_mask, "count_all"].values[0]
+    count_top5_category = pie_plot_merge.loc[category_mask, "count_top5"].values[0]
+    observed = [[count_all_category, count_top5_category],
+                [count_all - count_all_category, count_top5 - count_top5_category]]
+
+    # Perform G-test of independence
+    g_stat, p_value, dof, expected = chi2_contingency(observed, lambda_="log-likelihood")
+    results_df = results_df.append({
+        "Category": category,
+        "G-test statistic_all_v_top5": g_stat,
+        "P-value_all_v_top5": p_value,
+        "Degrees of freedom": dof,
+        "Expected frequencies_all_v_top5": expected
+    }, ignore_index=True)
+
+
+# In[153]:
+
+
+print(observed)
+
+
+# In[154]:
+
+
+print(results_df)
+
+
+# In[135]:
+
+
+# g test for top 1
+
+from scipy.stats import chi2_contingency
+results_df_top1 = pd.DataFrame(columns=["Category", "G-test statistic_all_v_top1", "P-value_all_v_top1", "Degrees of freedom", "Expected frequencies_all_v_top1"])
+
+# Perform G-test of independence for each category
+for _, row in pie_plot_merge_2.iterrows():
+    category = row["attribute"]
+    count_all = row["count_all"]
+    count_top1 = row["count_top1"]
+
+    # Create contingency table
+    observed = [[count_all, count_top1],
+                [sum(pie_plot["count_all"]) - count_all, sum(pie_plot_top1["count_top1"]) - count_top1]]
+
+    # Perform G-test of independence
+    g_stat, p_value, dof, expected = chi2_contingency(observed, lambda_="log-likelihood")
+
+    results_df_top1 = results_df_top1.append({
+        "Category": category,
+        "G-test statistic_all_v_top1": g_stat,
+        "P-value_all_v_top1": p_value,
+        "Degrees of freedom": dof,
+        "Expected frequencies_all_v_top1": expected
+    }, ignore_index=True)
+
+results_df_top1.to_csv('ch1_g_test_snpeff_top1.txt',sep='\t',index=False)
+
+
+# In[141]:
+
+
+results_df_top1.head()
+
+
+# In[132]:
+
+
+snpeff_fst_top5 = snpeff_fst[snpeff_fst['Fst'] >= 0.120806]
+snpeff_fst_top1 = snpeff_fst[snpeff_fst['Fst'] >= 0.28571399999999997]
+
+pie_plot['count'].sum()
+
+
+# In[128]:
+
+
+import plotly.express as px
+fig, ax = plt.subplots(figsize=(4, 5), subplot_kw=dict(aspect="equal"))
+
+#colors = ['#orang-FAA44E','#blue-4E95FA',  '#red-E69393','#brown-431B1B','#green-99E693', '#purpleA89CEC', ]
+colors = ['#4E95FA','#FAA44E','#99E693','#A89CEC','#E69393','#431B1B']
+recipe = snpeff_fst_top1['attribute2'].value_counts()
+wedges, texts = ax.pie(recipe, wedgeprops=dict(width=0.8), startangle=-80, radius=1.3,colors=colors)
+
+bbox_props = dict(boxstyle="square,pad=0.3", fc="w", ec="k", lw=0.72)
+kw = dict(arrowprops=dict(arrowstyle="-"),
+          bbox=bbox_props, zorder=0, va="center")
+percents = pie_plot['count'].to_numpy() * 100 / pie_plot['count'].to_numpy().sum()
+    
+ax.legend(wedges, labels=['%s, %1.2f %%' % (l, s) for l, s in zip(pie_plot['attribute'],percents)], title="Effects by type", loc="centre left", bbox_to_anchor=(1, 0.25, 1, 0.75))
+
+
+#ax.set_title("Number of SNPs with Fst in each region")
+plt.savefig('donut_snpeff_top1_may2.png', dpi=400, bbox_inches='tight')
+plt.show()
+
+
+# In[54]:
+
+
+snpeff_fst_top1['attribute2'].value_counts()
+
+
+# In[52]:
+
+
+pie_plot = snpeff_fst_top1['attribute2'].value_counts()
+pie_plot = pie_plot.reset_index()
+pie_plot.columns = ['attribute','count']
+pie_plot.head()
+#pie_plot['attribute'].unique()
+#pie_plot['attribute'] = pie_plot['attribute'].str.replace("_", ' ')
+#pie_plot['attribute'].value_counts()
+
+
+# In[53]:
+
+
+pie_plot
+
+
+# In[ ]:
+
+
+
+
+
+# # top 5%
+
+# In[20]:
+
+
+vcf_fst_merge_top5 = snpeff_fst_merge_effect[snpeff_fst_merge_effect['Fst_pairwise']>= 0.19354839]
+vcf_fst_merge_top1 = snpeff_fst_merge_effect[snpeff_fst_merge_effect['Fst_pairwise']>= 0.84464679]
+
+
+snpeff_fst_top5 = snpeff_fst[snpeff_fst['Fst'] >= 0.120806]
+snpeff_fst_top1 = snpeff_fst[snpeff_fst['Fst'] >= 0.28571399999999997]
+
+
+# In[ ]:
+
+
+snpeff_fst_top5.head()
+
+
+# In[57]:
+
+
+snpeff_fst_top5['attribute2'].value_counts().plot(kind = 'bar')
+plt.xticks(rotation=45, ha='right')
+
+
+# In[18]:
+
+
+# Chi square 
+
+all_counts = snpeff_fst['attribute2'].value_counts().rename_axis('effects by type').reset_index(name='counts')
+top5_counts = snpeff_fst_top5['attribute2'].value_counts().rename_axis('effects by type').reset_index(name='counts')
+top1_counts = snpeff_fst_top1['attribute2'].value_counts().rename_axis('effects by type').reset_index(name='counts')
+
+
+# # Chi square 
+# 
+# all_counts = snpeff_fst_merge_effect['effect'].value_counts().rename_axis('effects by type').reset_index(name='all_counts')
+# top5_counts = vcf_fst_merge_top5['effect'].value_counts().rename_axis('effects by type').reset_index(name='top5_counts')
+# top1_counts = vcf_fst_merge_top1['effect'].value_counts().rename_axis('effects by type').reset_index(name='top1_counts')
+
+# In[36]:
+
+
+#add column after with the top1, top5, all
+
+
+# In[ ]:
+
+
+all_counts['group'] = 'all'
+top5_counts['group'] = 'top5'
+top1_counts['group'] = 'top1'
+
+
+# In[151]:
+
+
+all_counts.head(50)
+
+
+# In[159]:
+
+
+contingency = pd.concat([all_counts,top5_counts],axis=0)
+contingency_2 = pd.concat([contingency,top1_counts],axis=0).reset_index(drop=True)
+contingency_2.head(100)
+
+
+# In[153]:
+
+
+final_counts = pd.merge(all_counts, top5_counts, how='outer',on='effects by type')
+final_counts_2 = pd.merge(final_counts, top1_counts, how='outer',on='effects by type')
+final_counts_2
+
+
+# final_counts_2.plot(kind = 'bar')
+
+# In[1]:
+
+
+from scipy.stats import chi2_contingency
+from scipy.stats import chi2
+
+data_crosstab = pd.crosstab(contingency_2['effects by type'], contingency_2['group'],margins = False)
+data_crosstab
+
+
+# In[161]:
+
+
+c, p, dof, expected = chi2_contingency(data_crosstab)
+p
+
+
+# In[162]:
+
+
+c
+
+
+# In[163]:
+
+
+dof
+
+
+# In[164]:
+
+
+expected
+
+
+# In[165]:
+
+
+print(data_crosstab)
+
+
+# In[166]:
+
+
+import seaborn as sns
+heat = sns.heatmap(data_crosstab)
+heat
+
+
+# In[71]:
+
+
+#chi square contingency table
+from scipy.stats import chi2_contingency
+from scipy.stats import chi2
+stat, p, dof, expected = chi2_contingency(data_crosstab)
+
+
+# In[ ]:
+
+
+
+
+
+# In[72]:
+
+
+print('dof=%d' % dof)
+print(expected)
+
+
+# In[73]:
+
+
+# interpret test-statistic
+
+##Chi-square test of independence of variables in a contingency table.This function computes the chi-square 
+#statistic and p-value for the hypothesis test of independence of the observed frequencies in the contingency table observed.
+#The expected frequencies are computed based on the marginal sums under the assumption of independence
+
+
+prob = 0.95
+critical = chi2.ppf(prob, dof)
+print('probability=%.3f, critical=%.3f, stat=%.3f' % (prob, critical, stat))
+if abs(stat) >= critical:
+    print('Dependent (reject H0)')
+else:
+    print('Independent (fail to reject H0)')
+
+
+# In[74]:
+
+
+# interpret p-value
+alpha = 1.0 - prob
+print('significance=%.3f, p=%.3f' % (alpha, p))
+if p <= alpha:
+    print('Dependent (reject H0)')
+else:
+    print('Independent (fail to reject H0)')
+
+
+# In[167]:
+
+
+import pandas as pd
+from scipy.stats import chi2_contingency
+
+# Create the DataFrame
+data = {
+    'effects by type': ['intron', 'intergenic', 'upstream', 'downstream', 'exon', 'intragenic_variant',
+                        'intron', 'intergenic', 'upstream', 'exon', 'downstream', 'intragenic_variant',
+                        'intergenic', 'intron', 'upstream', 'exon', 'downstream', 'intragenic_variant'],
+    'counts': [1272751, 938020, 620212, 194692, 192837, 5922,
+               56081, 55302, 28179, 9820, 8766, 332,
+               12186, 9799, 5691, 2201, 1715, 78],
+    'group': ['all', 'all', 'all', 'all', 'all', 'all',
+              'top5', 'top5', 'top5', 'top5', 'top5', 'top5',
+              'top1', 'top1', 'top1', 'top1', 'top1', 'top1']
+}
+
+df = pd.DataFrame(data)
+
+# Perform chi-square test of independence
+cross_table = pd.crosstab(df['effects by type'], df['group'])
+chi2, p_value, dof, expected = chi2_contingency(cross_table)
+
+# Print the results
+print("Chi-square statistic:", chi2)
+print("p-value:", p_value)
+print("Degrees of freedom:", dof)
+
+
+# # all values by snpeff category
+# 
+
+# 
+# ### total table
+
+# In[76]:
+
+
+all_snp_effect = snpeff_fst['attribute2'].value_counts()
+top5_snp_effect = snpeff_fst_top5['attribute2'].value_counts()
+top1_snp_effect = snpeff_fst_top1['attribute2'].value_counts()
+
+all_top5 = pd.concat([all_snp_effect,top5_snp_effect], axis=1, sort=False)
+all_top5_top1 = pd.concat([all_top5,top1_snp_effect], axis=1, sort=False)
+all_top5_top1.columns=['All_snps','top5','top1']
+print(all_top5_top1)
+
+
+# In[2]:
+
+
+all_top5_top1.head()
+
+
+# all_top5_top1.loc["Total"] = all_top5_top1.sum()
+# all_top5_top1
+
+# In[77]:
+
+
+all_top5_top1["all_snps_%"] = (all_top5_top1['All_snps'] / all_top5_top1['All_snps'].sum()) * 100
+all_top5_top1["top5_%"] = (all_top5_top1['top5'] / all_top5_top1['top5'].sum()) * 100
+all_top5_top1["top1_%"] = (all_top5_top1['top1'] / all_top5_top1['top1'].sum()) * 100
+all_top5_top1
+
+
+# ### top 5%
+
+# In[78]:
+
+
+all_top5 = pd.concat([all_snp_effect,top5_snp_effect], axis=1, sort=False)
+
+
+# In[79]:
+
+
+all_top5 = all_top5.dropna()
+all_top5.columns=['All_snps','top5']
+all_top5
+
+
+# In[80]:
+
+
+df_cont = pd.crosstab(index = all_top5['All_snps'], columns = all_top5['top5'])
+display(df_cont)
+
+
+# In[81]:
+
+
+def chi2_by_hand(df, col1, col2):    
+    #---create the contingency table---
+    df_cont = pd.crosstab(index = all_top5['All_snps'], columns = all_top5['top5'])
+    display(df_cont)
+    #---calculate degree of freedom---
+    degree_f = (df_cont.shape[0]-1) * (df_cont.shape[1]-1)
+    #---sum up the totals for row and columns---
+    df_cont.loc[:,'Total']= df_cont.sum(axis=1)
+    df_cont.loc['Total']= df_cont.sum()
+    print('---Observed (O)---')
+    display(df_cont)
+    #---create the expected value dataframe---
+    df_exp = df_cont.copy()    
+    df_exp.iloc[:,:] = np.multiply.outer(df_cont.sum(1).values,df_cont.sum().values)  
+    df_cont.sum().sum()           
+    print('---Expected (E)---')
+    display(df_exp)
+        
+    # calculate chi-square values
+    df_chi2 = ((df_cont - df_exp)**2) / df_exp    
+    df_chi2.loc[:,'Total']= df_chi2.sum(axis=1)
+    df_chi2.loc['Total']= df_chi2.sum()
+    
+    print('---Chi-Square---')
+    display(df_chi2)
+    #---get chi-square score---   
+    chi_square_score = df_chi2.iloc[:-1,:-1].sum().sum()
+    
+    return chi_square_score, degree_f
+
+
+# In[ ]:
+
+
+
+
+
+# In[85]:
+
+
+chi_score, degree_f
+
+
+# In[83]:
+
+
+chi_score, degree_f = chi2_by_hand(all_top5,'All_snps','top5')
+
+
+# In[86]:
+
+
+chi_score, degree_f
+
+
+# ### top5% conclusion
+# 
+# -according to chi square table, at p=0.05 chi2 value is 36.415 so our value of 427.55 is much higher, reject null hypothesis and accept alternate hypothesis that they are dependent 
+# 
+
+# # top1 vs all
+
+# In[73]:
+
+
+all_top1 = pd.concat([all_snp_effect,top1_snp_effect], axis=1, sort=False)
+all_top1 = all_top1.dropna()
+all_top1.columns=['All_snps','top1']
+all_top1
+
+
+# In[74]:
+
+
+def chi2_by_hand(df, col1, col2):    
+    #---create the contingency table---
+    df_cont = pd.crosstab(index = all_top1['All_snps'], columns = all_top1['top1'])
+    display(df_cont)
+    #---calculate degree of freedom---
+    degree_f = (df_cont.shape[0]-1) * (df_cont.shape[1]-1)
+    #---sum up the totals for row and columns---
+    df_cont.loc[:,'Total']= df_cont.sum(axis=1)
+    df_cont.loc['Total']= df_cont.sum()
+    print('---Observed (O)---')
+    display(df_cont)
+    #---create the expected value dataframe---
+    df_exp = df_cont.copy()    
+    df_exp.iloc[:,:] = np.multiply.outer(df_cont.sum(1).values,df_cont.sum().values)  
+    df_cont.sum().sum()           
+    print('---Expected (E)---')
+    display(df_exp)
+        
+    # calculate chi-square values
+    df_chi2 = ((df_cont - df_exp)**2) / df_exp    
+    df_chi2.loc[:,'Total']= df_chi2.sum(axis=1)
+    df_chi2.loc['Total']= df_chi2.sum()
+    
+    print('---Chi-Square---')
+    display(df_chi2)
+    #---get chi-square score---   
+    chi_square_score = df_chi2.iloc[:-1,:-1].sum().sum()
+    
+    return chi_square_score, degree_f
+
+
+# In[75]:
+
+
+chi_score, degree_f = chi2_by_hand(all_top1,'All_snps','top1')
+
+
+# In[76]:
+
+
+chi_square_score, degree_f
+
+
+# ## CV error plotting for admixture 
+
+# In[77]:
+
+
+# Import pandas library
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+# initialize list elements
+K = [1,2,3,4]
+CV = [0.852,1.046,1.072,1.147]
+# Create the pandas DataFrame with column name is provided explicitly
+df = pd.DataFrame(K, columns=['K'])
+df1 = pd.DataFrame(CV, columns=['CV'])
+  
+# print dataframe.
+df_df1 = pd.concat([df,df1],axis=1)
+df_df1.head()
+
+
+# In[78]:
+
+
+#sns.lineplot(data='df_df1', x='CV', y='K')
+
+
+
+
+#sns.set_context('talk')
+#plt.figure(figsize=(50,10))
+
+# Time-series plot
+sns.lineplot(x='K', y='CV', data=df_df1, ci=None)
+
+# Rolling average plot
+#sns.lineplot(x='batch_no', y='7_batch_average', label='7-batch average', data=data, ci=None)
+
+plt.xlabel("K")
+plt.ylabel("Cross Validation Error")
+#plt.xticks(rotation="90")
+
+plt.show()
+
+
+# In[ ]:
+
+
+
+
