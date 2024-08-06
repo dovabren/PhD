@@ -1,28 +1,34 @@
+filename='annotated_drones_and_queen.txt'
+cat $filename | while read -r file
+do
+sid="$(cut -d'.' -f5 <<<$file)"
+
+
 # using raw_variants_annotated files, combine in "family" groups and filter
-java -jar /usr/local/src/GenomeAnalysisTK.jar -T GenotypeGVCFs -R /data2/Training_set/HAV3.1_renamed.fa --variant A_Xannotated.vcf -o X.g.vcf
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T GenotypeGVCFs -R /data2/Training_set/HAV3.1_renamed.fa --variant A_dr01m_raw_variants_BR_h2_annotated.vcf --variant A_dr05m_raw_variants_BR_h2_annotated.vcf --variant A_dr06m_raw_variants_BR_h2_annotated.vcf --variant A_dr07m_raw_variants_BR_h2_annotated.vcf --variant A_dr08m_raw_variants_BR_h2_annotated.vcf --variant A_qu1yrX_raw_variants_BR_annotated.vcf -o A_queen_drone.g.vcf
 
-java -jar /usr/local/src/GenomeAnalysisTK.jar -T SelectVariants -R /data2/Training_set/HAV3.1_renamed.fa -V X.g.vcf -selectType SNP -o X_snp.vcf
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T SelectVariants -R /data2/Training_set/HAV3.1_renamed.fa -V A_queen_drone.g.vcf -selectType SNP -o A_queen_drone_SNP.vcf
 
-java -jar /usr/local/src/GenomeAnalysisTK.jar -T SelectVariants -R /data2/Training_set/HAV3.1_renamed.fa -V X.g.vcf -selectType INDEL -o X.vcf
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T SelectVariants -R /data2/Training_set/HAV3.1_renamed.fa -V A_queen_drone.g.vcf -selectType INDEL -o A_queen_drone_INDEL.vcf
 
-java -Xmx4g -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantRecalibrator -R /data2/Training_set/HAV3.1_renamed.fa -input B_qu1yr_dr_BR_h2_snp.vcf -recalFile B_qu1yr_dr_BR_h2.recal -tranchesFile B_qu1yr_dr_BR_h2.tranches -resource:hapmap,known=false,training=true,truth=true,prior=15.0 /data2/Training_set/SNP_TRAINING_lifted_over.vcf -an QD -an MQ -an MQRankSum -an ReadPosRankSum -an FS -an SOR -an DP -mode SNP -nt 4
+java -Xmx4g -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantRecalibrator -R /data2/Training_set/HAV3.1_renamed.fa -input A_queen_drone_SNP.vcf -recalFile A_queen_drone.recal -tranchesFile A_queen_drone.tranches -resource:hapmap,known=false,training=true,truth=true,prior=15.0 /data2/Training_set/SNP_TRAINING_lifted_over.vcf -an QD -an MQ -an MQRankSum -an ReadPosRankSum -an FS -an SOR -an DP -mode SNP -nt 4
 
-java -Xmx3g -jar /usr/local/src/GenomeAnalysisTK.jar -T ApplyRecalibration -R /data2/Training_set/HAV3.1_renamed.fa -input B_qu1yr_dr_BR_h2_snp.vcf -tranchesFile B_qu1yr_dr_BR_h2.tranches -recalFile B_qu1yr_dr_BR_h2.recal -o B_qu1yr_dr_BR_h2_recalibrated_snp.vcf --ts_filter_level 99.5 -mode SNP
+java -Xmx3g -jar /usr/local/src/GenomeAnalysisTK.jar -T ApplyRecalibration -R /data2/Training_set/HAV3.1_renamed.fa -input A_queen_drone_SNP.vcf -tranchesFile A_queen_drone.tranches -recalFile A_queen_drone.recal -o A_queen_drone_recalibrated_SNP.vcf --ts_filter_level 99.5 -mode SNP
 
-java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/HAV3.1_renamed.fa -V B_qu1yr_dr_BR_h2_recalibrated_snp.vcf --filterExpression "MQ < 40.0" --filterName "LowMQ40" --filterExpression "QD < 2.0" --filterName "LowQD2" --filterExpression "FS > 60" --filterName "FS60" --filterExpression "SOR > 3" --filterName "SOR" --filterExpression "DP > 42.91" --filterName "DPhigh" --filterExpression "DP < -8.41" --filterName "DPlow" --filterExpression "ReadPosRankSum < -8.0" --filterName "RPRShigh" --filterExpression "MappingQualityRankSum < -12.5" --filterName "MQRSlow" -o B_qu1yr_dr_BR_h2_hardfiltered.vcf
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/HAV3.1_renamed.fa -V A_queen_drone_recalibrated_SNP.vcf --filterExpression "MQ < 40.0" --filterName "LowMQ40" --filterExpression "QD < 2.0" --filterName "LowQD2" --filterExpression "FS > 60" --filterName "FS60" --filterExpression "SOR > 3" --filterName "SOR" --filterExpression "DP > 42.91" --filterName "DPhigh" --filterExpression "DP < -8.41" --filterName "DPlow" --filterExpression "ReadPosRankSum < -8.0" --filterName "RPRShigh" --filterExpression "MappingQualityRankSum < -12.5" --filterName "MQRSlow" -o A_queen_drone_hardfiltered.vcf
 
-java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/HAV3.1_renamed.fa -V B_qu1yr_dr_BR_h2_hardfiltered.vcf --mask B_qu1yr_dr_BR_h2_indel.vcf --maskExtension 5 --maskName "Indel" -o B_qu1yr_dr_BR_h2_noINDEL.vcf
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/HAV3.1_renamed.fa -V A_queen_drone_hardfiltered.vcf --mask A_queen_drone_INDEL.vcf --maskExtension 5 --maskName "Indel" -o A_queen_drone_noINDEL.vcf
 
-java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/HAV3.1_renamed.fa -V B_qu1yr_dr_BR_h2_noINDEL.vcf --mask /data2/Training_set/brock_gatk_lofreq_ambiguous_sites_lifted_over.bed --maskExtension 5 --maskName "CNV" -o B_qu1yr_dr_BR_h2_noINDEL_noCNV.vcf
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/HAV3.1_renamed.fa -V A_queen_drone_noINDEL.vcf --mask /data2/Training_set/brock_gatk_lofreq_ambiguous_sites_lifted_over.bed --maskExtension 5 --maskName "CNV" -o A_queen_drone_noINDEL_noCNV.vcf
 
-cat B_qu1yr_dr_BR_h2_noINDEL_noCNV.vcf | vcf-convert -v 4.1 > B_qu1yr_dr_BR_h2_filter2.vcf 
+cat A_queen_drone_noINDEL_noCNV.vcf | vcf-convert -v 4.1 > A_queen_drone_filter2.vcf 
 
-vcftools --vcf B_qu1yr_dr_BR_h2_filter2.vcf --remove-filtered-all --recode --recode-INFO-all --out B_qu1yr_dr_BR_h2_filter3.vcf
+vcftools --vcf A_queen_drone_filter2.vcf --remove-filtered-all --recode --recode-INFO-all --out A_queen_drone_filter3.vcf
 
-grep -v '\QIU*' B_qu1yr_dr_BR_h2_filter3.vcf.recode.vcf > B_qu1yr_dr_BR_h2_filter4.vcf
+grep -v '\QIU*' A_queen_drone_filter3.vcf.recode.vcf > A_queen_drone_filter4.vcf
 
-grep -v 'CM009947.2' B_qu1yr_dr_BR_h2_filter4.vcf > B_qu1yr_dr_BR_h2_filter5.vcf
+grep -v 'CM009947.2' A_queen_drone_filter4.vcf > A_queen_drone_filter5.vcf
 
-sed '/\.\/\./d' B_qu1yr_dr_BR_h2_filter5.vcf > B_qu1yr_dr_BR_h2_filter6.vcf
+sed '/\.\/\./d' A_queen_drone_filter5.vcf > A_queen_drone_filter6.vcf
  
-bcftools query -f '%CHROM\t%POS\t%REF\t%ALT\t%TYPE[\t%GT]\n' B_qu1yr_dr_BR_h2_filter6.vcf > B_qu1yr_dr_BR_h2_filter7.vcf
+bcftools query -f '%CHROM\t%POS\t%REF\t%ALT\t%TYPE[\t%GT]\n' A_queen_drone_filter6.vcf > A_queen_drone_filter7.vcf
