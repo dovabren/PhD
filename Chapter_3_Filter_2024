@@ -26,3 +26,26 @@ grep -v 'CM009947.2' A_queen_drone_filter4.vcf > A_queen_drone_filter5.vcf
 sed '/\.\/\./d' A_queen_drone_filter5.vcf > A_queen_drone_filter6.vcf
  
 bcftools query -f '%CHROM\t%POS\t%REF\t%ALT\t%TYPE[\t%GT]\n' A_queen_drone_filter6.vcf > A_queen_drone_filter7.vcf
+
+#separate into files 
+java -jar ./gatk-4.1.3.0/gatk-package-4.1.3.0-local.jar SelectVariants -R /data2/Training_set/HAV3.1_renamed.fa -V A_queen_drone_filter6.vcf -O A_queen_drone_filter6.vcf -sn A-01 -sn A-05 -sn A-06 -sn A-07 -sn A-08 -sn A-Queen
+
+
+
+filename='jvarkit.txt'
+cat $filename | while read -r file
+do
+sid="$(cut -d'.' -f5 <<<$file)"
+#
+
+grep -v "0/1" $sid".vcf" > $sid"_nohet_1.vcf" 
+grep -v "0/2" $sid"_nohet_1.vcf" > $sid"_nohet_2.vcf" 
+grep -v "1/2" $sid"_nohet_2.vcf" > $sid"_nohet_3.vcf" 
+grep -v "2/2" $sid"_nohet_3.vcf" > $sid"_nohet_4.vcf" 
+grep -v "3/3" $sid"_nohet_4.vcf" > $sid"_nohet_5.vcf" 
+grep -v "4/4" $sid"_nohet_5.vcf" > $sid"_nohet_6.vcf" 
+
+java -jar jvarkit/dist/vcffilterjs.jar -f jvarkit/dist/select.js $sid"_nohet_6.vcf"  > $sid"_unique.vcf"
+
+
+done
