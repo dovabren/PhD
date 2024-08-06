@@ -1,0 +1,35 @@
+filename='queen_names.txt'
+cat $filename | while read -r file
+do
+sid="$(cut -d'.' -f5 <<<$file)"
+
+java -jar /data3/Trimmomatic-0.36/trimmomatic-0.36.jar PE -threads 36 -phred33 $file"_R1.fastq.gz" $file"_R2.fastq.gz" $sid"_paired_R1.fastq.gz" $sid"_unpaired_R1.fastq.gz" $sid"_paired_R2.fastq.gz" $sid"_unpaired_R2.fastq.gz" ILLUMINACLIP:/usr/local/scripts/ADAPTER.fa:2:30:10 LEADING:20 TRAILING:20 SLIDINGWINDOW:20:25 MINLEN:35
+
+fastqc -t 36 $sid*paired*
+
+ngm -r /data2/Training_set/HAV3.1_renamed.fa -p -1 $sid"_paired_R1.fastq.gz" -2 $sid"_paired_R2.fastq.gz" -t 36 -b --rg-id $sid --rg-sm $sid --rg-lb PE --rg-pl Illumina -o $sid"_ngm_aligned.bam"
+
+samtools sort $sid"_ngm_aligned.bam" -o $sid"_ngm_aligned_sorted.bam" 
+
+samtools index $sid"_ngm_aligned_sorted.bam"
+
+samtools depth $sid"_ngm_aligned_sorted.bam" > $sid"_depth.txt"
+
+/data3/dova_nanuq_raw_data/qualimap_v2.2.1/qualimap bamqc -bam $sid"_ngm_aligned_sorted.bam" -outfile $sid"_qualimap.pdf" --java-mem-size=4G 
+
+java -jar /usr/local/src/picard-tools-2.1.0/picard.jar MarkDuplicates I=$sid"_ngm_aligned_sorted.bam" O=$sid"_marked_duplicates.bam" M=$sid"_marked_dup_metrics.txt" VALIDATION_STRINGENCY=SILENT MAX_FILE_HANDLES_FOR_READ_ENDS_MAP=1000
+
+samtools index $sid"_marked_duplicates.bam"
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T BaseRecalibrator -nct 36 -R /data2/Training_set/HAV3.1_renamed.fa -I $sid"_marked_duplicates.bam" --knownSites /data2/Training_set/INDEL_TRAINING_lifted_over.vcf --knownSites /data2/Training_set/SNP_TRAINING_lifted_over.vcf -o $sid".recal.table"
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T PrintReads -R /data2/Training_set/HAV3.1_renamed.fa -nct 36 -I $sid"_marked_duplicates.bam" -BQSR $sid".recal.table" -o $sid"_BQSR_BR.bam"
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T CallableLoci -R /data2/Training_set/HAV3.1_renamed.fa -I $sid"_BQSR_BR.bam" -summary $sid"_BR_sum.txt" -o $sid"_BR_callable.bed"
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T HaplotypeCaller -nct 20 -R /data2/Training_set/HAV3.1_renamed.fa -I $sid"_BQSR_BR.bam" --genotyping_mode DISCOVERY -stand_emit_conf 10 -stand_call_conf 30 --emitRefConfidence GVCF -ploidy 2 -o $sid"_raw_variants_BR.g.vcf"
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -R /data2/Training_set/HAV3.1_renamed.fa -T VariantAnnotator -I $sid"_BQSR_BR.bam" -V $sid"_raw_variants_BR.g.vcf" -o $sid"_raw_variants_BR_annotated.g.vcf" -A Coverage -A FisherStrand -A MappingQualityRankSumTest -A RMSMappingQuality -A ReadPosRankSumTest -A StrandOddsRatio -A QualByDepth --dbsnp /data2/Training_set/SNP_TRAINING_lifted_over.vcf
+
+
+done
