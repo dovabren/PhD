@@ -1,23 +1,48 @@
 # using raw_variants_annotated files, combine in "family" groups and filter
-java -jar /usr/local/src/GenomeAnalysisTK.jar -T GenotypeGVCFs -R /data2/Training_set/HAV3.1_renamed.fa --variant A_dr01m_raw_variants_BR_h2_annotated.vcf --variant A_dr05m_raw_variants_BR_h2_annotated.vcf --variant A_dr06m_raw_variants_BR_h2_annotated.vcf --variant A_dr07m_raw_variants_BR_h2_annotated.vcf --variant A_dr08m_raw_variants_BR_h2_annotated.vcf --variant A_qu1yrX_raw_variants_BR_annotated.vcf -o A_queen_drone.g.vcf
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T GenotypeGVCFs -R /data2/Training_set/HAV3.1_renamed.fa --variant C_dr01Xm_raw_variants_BR_h2_annotated.vcf --variant C_dr03m_raw_variants_BR_h2_annotated.vcf --variant C_dr04m_raw_variants_BR_h2_annotated.vcf --variant C_dr05m_raw_variants_BR_h2_annotated.vcf --variant C_dr06m_raw_variants_BR_h2_annotated.vcf --variant C_qu1yr_raw_variants_BR_h2_annotated.vcf -o C_queen_drone.g.vcf
 
-java -jar /usr/local/src/GenomeAnalysisTK.jar -T SelectVariants -R /data2/Training_set/HAV3.1_renamed.fa -V A_queen_drone.g.vcf -selectType SNP -o A_queen_drone_SNP.vcf
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T SelectVariants -R /data2/Training_set/HAV3.1_renamed.fa -V C_queen_drone.g.vcf -selectType SNP -o C_queen_drone_SNP.vcf
 
-java -jar /usr/local/src/GenomeAnalysisTK.jar -T SelectVariants -R /data2/Training_set/HAV3.1_renamed.fa -V A_queen_drone.g.vcf -selectType INDEL -o A_queen_drone_INDEL.vcf
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T SelectVariants -R /data2/Training_set/HAV3.1_renamed.fa -V C_queen_drone.g.vcf -selectType INDEL -o C_queen_drone_INDEL.vcf
 
-java -Xmx4g -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantRecalibrator -R /data2/Training_set/HAV3.1_renamed.fa -input A_queen_drone_SNP.vcf -recalFile A_queen_drone.recal -tranchesFile A_queen_drone.tranches -resource:hapmap,known=false,training=true,truth=true,prior=15.0 /data2/Training_set/SNP_TRAINING_lifted_over.vcf -an QD -an MQ -an MQRankSum -an ReadPosRankSum -an FS -an SOR -an DP -mode SNP -nt 4
+java -Xmx4g -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantRecalibrator -R /data2/Training_set/HAV3.1_renamed.fa -input C_queen_drone_SNP.vcf -recalFile C_queen_drone.recal -tranchesFile C_queen_drone.tranches -resource:hapmap,known=false,training=true,truth=true,prior=15.0 /data2/Training_set/SNP_TRAINING_lifted_over.vcf -an QD -an MQ -an MQRankSum -an ReadPosRankSum -an FS -an SOR -an DP -mode SNP -nt 4
 
-java -Xmx3g -jar /usr/local/src/GenomeAnalysisTK.jar -T ApplyRecalibration -R /data2/Training_set/HAV3.1_renamed.fa -input A_queen_drone_SNP.vcf -tranchesFile A_queen_drone.tranches -recalFile A_queen_drone.recal -o A_queen_drone_recalibrated_SNP.vcf --ts_filter_level 99.5 -mode SNP
+java -Xmx3g -jar /usr/local/src/GenomeAnalysisTK.jar -T ApplyRecalibration -R /data2/Training_set/HAV3.1_renamed.fa -input C_queen_drone_SNP.vcf -tranchesFile C_queen_drone.tranches -recalFile C_queen_drone.recal -o C_queen_drone_recalibrated_SNP.vcf --ts_filter_level 99.5 -mode SNP
 
-java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/HAV3.1_renamed.fa -V A_queen_drone_recalibrated_SNP.vcf --filterExpression "MQ < 40.0" --filterName "LowMQ40" --filterExpression "QD < 2.0" --filterName "LowQD2" --filterExpression "FS > 60" --filterName "FS60" --filterExpression "SOR > 3" --filterName "SOR" --filterExpression "DP > 42.91" --filterName "DPhigh" --filterExpression "DP < -8.41" --filterName "DPlow" --filterExpression "ReadPosRankSum < -8.0" --filterName "RPRShigh" --filterExpression "MappingQualityRankSum < -12.5" --filterName "MQRSlow" -o A_queen_drone_hardfiltered.vcf
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/HAV3.1_renamed.fa -V C_queen_drone_recalibrated_SNP.vcf --filterExpression "MQ < 40.0" --filterName "LowMQ40" --filterExpression "QD < 2.0" --filterName "LowQD2" --filterExpression "FS > 60" --filterName "FS60" --filterExpression "SOR > 3" --filterName "SOR" --filterExpression "ReadPosRankSum < -8.0" --filterName "RPRShigh" --filterExpression "MappingQualityRankSum < -12.5" --filterName "MQRSlow" -o C_queen_drone_hardfiltered.vcf
 
-java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/HAV3.1_renamed.fa -V A_queen_drone_hardfiltered.vcf --mask A_queen_drone_INDEL.vcf --maskExtension 5 --maskName "Indel" -o A_queen_drone_noINDEL.vcf
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/HAV3.1_renamed.fa -V C_queen_drone_hardfiltered.vcf --mask C_queen_drone_INDEL.vcf --maskExtension 5 --maskName "Indel" -o C_queen_drone_noINDEL.vcf
 
-java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/HAV3.1_renamed.fa -V A_queen_drone_noINDEL.vcf --mask /data2/Training_set/brock_gatk_lofreq_ambiguous_sites_lifted_over.bed --maskExtension 5 --maskName "CNV" -o A_queen_drone_noINDEL_noCNV.vcf
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/HAV3.1_renamed.fa -V C_queen_drone_noINDEL.vcf --mask /data2/Training_set/brock_gatk_lofreq_ambiguous_sites_lifted_over.bed --maskExtension 5 --maskName "CNV" -o C_queen_drone_noINDEL_noCNV.vcf
 
-cat A_queen_drone_noINDEL_noCNV.vcf | vcf-convert -v 4.1 > A_queen_drone_filter2.vcf 
 
-vcftools --vcf A_queen_drone_filter2.vcf --remove-filtered-all --recode --recode-INFO-all --out A_queen_drone_filter3.vcf
+
+###################################customize
+#split into drone file, filter on depth
+java -jar /data3/dova_nanuq_raw_data/gatk-4.1.3.0/gatk-package-4.1.3.0-local.jar SelectVariants -R /data2/Training_set/HAV3.1_renamed.fa -V B_queen_drone_noINDEL_noCNV.vcf -O B_queen.vcf -sn B_qu1yrX
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/HAV3.1_renamed.fa -V A_queen.vcf --filterExpression "DP < 50.0" --filterName "LowDPQueen" --filterExpression "DP > 150.0" --filterName "HighDPQueen" -o A_queen_depth.vcf
+
+
+java -jar /data3/dova_nanuq_raw_data/gatk-4.1.3.0/gatk-package-4.1.3.0-local.jar SelectVariants -R /data2/Training_set/HAV3.1_renamed.fa -V A_queen_drone_filter2.vcf -O A_drones.vcf -sn A_dr01m -sn A_dr05m -sn A_dr06m -sn A_dr07m -sn A_dr08m
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/HAV3.1_renamed.fa -V A_drones.vcf --filterExpression "DP < 10.0" --filterName "LowDPDrone" --filterExpression "DP > 90.0" --filterName "HighDPDrone" -o A_drones_depth.vcf
+
+bgzip A_drones_depth.vcf
+bgzip A_queen_depth.vcf 
+
+bcftools index A_queen_depth.vcf.gz
+bcftools index A_drones_depth.vcf.gz
+
+bcftools merge A_queen_depth.vcf.gz A_drones_depth.vcf.gz > A_queen_drones_depth.vcf
+##############################################
+
+cat A_queen_drones_depth.vcf | vcf-convert -v 4.1 > A_queen_drone_depth_filter2.vcf
+
+vcftools --vcf A_queen_drone_depth_filter2.vcf --remove-filtered-all --recode --recode-INFO-all --out A_queen_drone_filter3.vcf
+
+
+
 
 grep -v '\QIU*' A_queen_drone_filter3.vcf.recode.vcf > A_queen_drone_filter4.vcf
 
@@ -25,27 +50,14 @@ grep -v 'CM009947.2' A_queen_drone_filter4.vcf > A_queen_drone_filter5.vcf
 
 sed '/\.\/\./d' A_queen_drone_filter5.vcf > A_queen_drone_filter6.vcf
  
-bcftools query -f '%CHROM\t%POS\t%REF\t%ALT\t%TYPE[\t%GT]\n' A_queen_drone_filter6.vcf > A_queen_drone_filter7.vcf
+#bcftools query -f '%CHROM\t%POS\t%REF\t%ALT\t%TYPE[\t%GT]\n' A_queen_drone_filter6.vcf > A_queen_drone_filter7.vcf
 
 #separate into files 
-java -jar ./gatk-4.1.3.0/gatk-package-4.1.3.0-local.jar SelectVariants -R /data2/Training_set/HAV3.1_renamed.fa -V A_queen_drone_filter6.vcf -O A_queen_drone_filter6.vcf -sn A-01 -sn A-05 -sn A-06 -sn A-07 -sn A-08 -sn A-Queen
+#java -jar ./gatk-4.1.3.0/gatk-package-4.1.3.0-local.jar SelectVariants -R /data2/Training_set/HAV3.1_renamed.fa -V A_queen_drone_filter6.vcf -O A_queen_drone_filter6.vcf -sn A-01 -sn A-05 -sn A-06 -sn A-07 -sn A-08 -sn A-Queen
+
+grep -v "0/1" A_queen_drone_filter6.vcf | grep -v "0/2" | grep -v "1/2" | grep -v "2/2" | grep -v "3/3" | grep -v "4/4" > A_queen_drone_filter6_nohet.vcf
 
 
+java -jar /data3/dova_nanuq_raw_data/jvarkit/dist/vcffilterjs.jar -f /data3/dova_nanuq_raw_data/jvarkit/dist/select.js A_queen_drone_filter6_nohet.vcf > A_queen_drone_unique.vcf
 
-filename='jvarkit.txt'
-cat $filename | while read -r file
-do
-sid="$(cut -d'.' -f5 <<<$file)"
-#
-
-grep -v "0/1" $sid".vcf" > $sid"_nohet_1.vcf" 
-grep -v "0/2" $sid"_nohet_1.vcf" > $sid"_nohet_2.vcf" 
-grep -v "1/2" $sid"_nohet_2.vcf" > $sid"_nohet_3.vcf" 
-grep -v "2/2" $sid"_nohet_3.vcf" > $sid"_nohet_4.vcf" 
-grep -v "3/3" $sid"_nohet_4.vcf" > $sid"_nohet_5.vcf" 
-grep -v "4/4" $sid"_nohet_5.vcf" > $sid"_nohet_6.vcf" 
-
-java -jar jvarkit/dist/vcffilterjs.jar -f jvarkit/dist/select.js $sid"_nohet_6.vcf"  > $sid"_unique.vcf"
-
-
-done
+bcftools query -f '%CHROM\t%POS\t%REF\t%ALT\t%TYPE[\t%GT]\n' A_queen_drone_unique.vcf > A_queen_drone_unique_GT.vcf
