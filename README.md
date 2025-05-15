@@ -3,6 +3,4 @@
 
 ##chapter 2- selection associated with ceratina calcarata with ceratina strenua as an outgroup 
 
-##chapter 3- mutation rate changes with honey bee queen aging 
-
-##chapter 4- changes in recombination rate associated with queen aging 
+##chapter 3- mutation rate changes with honey bee queen aging and changes in recombination rate associated with queen aging 
