@@ -1,0 +1,171 @@
+############# start from here, make sure diploid or run above again from fastq files 
+
+############# FILTER - example of Z,V,M samples
+java -jar /data3/dova_nanuq_raw_data/gatk-4.1.3.0/gatk-package-4.1.3.0-local.jar CombineGVCFs -R /data2/Training_set/HAV3.1_renamed.fa --variant V-01_raw_variants_BR_annotated.g.vcf --variant V-02_raw_variants_BR_annotated.g.vcf --variant V-03_raw_variants_BR_annotated.g.vcf --variant V-04_raw_variants_BR_annotated.g.vcf --variant V-05_raw_variants_BR_annotated.g.vcf -O V_raw_variants.g.vcf
+
+java -jar /data3/dova_nanuq_raw_data/gatk-4.1.3.0/gatk-package-4.1.3.0-local.jar CombineGVCFs -R /data2/Training_set/HAV3.1_renamed.fa --variant M-01_raw_variants_BR_annotated.g.vcf --variant M-02_raw_variants_BR_annotated.g.vcf --variant M-04_raw_variants_BR_annotated.g.vcf --variant M-05_raw_variants_BR_annotated.g.vcf -O M_raw_variants.g.vcf
+
+java -jar /data3/dova_nanuq_raw_data/gatk-4.1.3.0/gatk-package-4.1.3.0-local.jar CombineGVCFs -R /data2/Training_set/HAV3.1_renamed.fa --variant Z-01_raw_variants_BR_annotated.g.vcf --variant Z-03_raw_variants_BR_annotated.g.vcf --variant Z-04_raw_variants_BR_annotated.g.vcf --variant Z-05_raw_variants_BR_annotated.g.vcf -O Z_raw_variants.g.vcf
+
+######### run the following as a script:
+
+#D9_135_V_M_filter_drones.txt
+D9_raw_variants.g.vcf
+D135_raw_variants.g.vcf
+V_raw_variants.g.vcf
+M_raw_variants.g.vcf
+Z_raw_variants.g.vcf
+
+## D9_135_V_M_filter.sh
+filename="D9_135_V_M_filter_drones.txt"
+cat $filename | while read -r file
+do
+  # Extract sample ID between "combined_" and "_R1.fastq.gz" or "_R2.fastq.gz"
+  sid="$(echo "$file" | cut -d'_' -f1-2)"
+  echo "Processing sample ID: $sid"
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T GenotypeGVCFs -R /data2/Training_set/HAV3.1_renamed.fa --variant $file -o $sid"_genotype.g.vcf"
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T SelectVariants -R /data2/Training_set/HAV3.1_renamed.fa -V $sid"_genotype.g.vcf" -selectType SNP -o $sid"_genotype_SNP.vcf"
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T SelectVariants -R /data2/Training_set/HAV3.1_renamed.fa -V $sid"_genotype.g.vcf" -selectType INDEL -o $sid"_genotype_INDEL.vcf"
+
+java -Xmx4g -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantRecalibrator -R /data2/Training_set/HAV3.1_renamed.fa -input $sid"_genotype_SNP.vcf" -recalFile $sid"_genotype.recal" -tranchesFile $sid"_genotype.tranches" -resource:hapmap,known=false,training=true,truth=true,prior=15.0 /data2/Training_set/SNP_TRAINING_lifted_over.vcf -an QD -an MQ -an MQRankSum -an ReadPosRankSum -an FS -an SOR -an DP -mode SNP -nt 4
+
+java -Xmx3g -jar /usr/local/src/GenomeAnalysisTK.jar -T ApplyRecalibration -R /data2/Training_set/HAV3.1_renamed.fa -input $sid"_genotype_SNP.vcf" -tranchesFile $sid"_genotype.tranches" -recalFile $sid"_genotype.recal" -o $sid"_recalibrated_SNP.vcf" --ts_filter_level 99.5 -mode SNP
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/HAV3.1_renamed.fa -V $sid"_recalibrated_SNP.vcf" --filterExpression "MQ < 40.0" --filterName "LowMQ40" --filterExpression "QD < 2.0" --filterName "LowQD2" --filterExpression "FS > 60" --filterName "FS60" --filterExpression "SOR > 3" --filterName "SOR" --filterExpression "ReadPosRankSum < -8.0" --filterName "RPRShigh" --filterExpression "MappingQualityRankSum < -12.5" --filterName "MQRSlow" -o $sid"_hardfiltered.vcf"
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/HAV3.1_renamed.fa -V $sid"_hardfiltered.vcf" --mask $sid"_genotype_INDEL.vcf" --maskExtension 5 --maskName "Indel" -o $sid"_genotype_noINDEL.vcf"
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T VariantFiltration -R /data2/Training_set/HAV3.1_renamed.fa -V $sid"_genotype_noINDEL.vcf" --mask /data2/Training_set/brock_gatk_lofreq_ambiguous_sites_lifted_over.bed --maskExtension 5 --maskName "CNV" -o $sid"_genotype_noINDEL_noCNV.vcf"
+
+done
+
+###############split_vcfs_by_sample.sh
+
+
+
+#!/bin/bash
+
+# Set your reference genome path
+REFERENCE="/data2/Training_set/HAV3.1_renamed.fa"
+GATK_JAR="/usr/local/src/GenomeAnalysisTK.jar"
+
+# List of VCF files to process - change as needed 
+VCF_FILES=("V_raw_genotype_noINDEL_noCNV.vcf" "Z_raw_genotype_noINDEL_noCNV.vcf" "M_raw_genotype_noINDEL_noCNV.vcf")
+
+for VCF in "${VCF_FILES[@]}"; do
+    echo "Processing $VCF..."
+
+    # Extract the sample names from the header line (starts with a single #)
+    SAMPLES=$(awk '/^#CHROM/ {for(i=10;i<=NF;i++) print $i}' "$VCF")
+
+    for SAMPLE in $SAMPLES; do
+        # Generate output file name
+        BASENAME=$(basename "$VCF" .vcf)
+        OUTPUT="${SAMPLE}_${BASENAME}.vcf"
+
+        echo "  Extracting sample: $SAMPLE -> $OUTPUT"
+        java -jar "$GATK_JAR" \
+            -T SelectVariants \
+            -R "$REFERENCE" \
+            -V "$VCF" \
+            -sn "$SAMPLE" \
+            -o "$OUTPUT"
+    done
+done
+
+
+###########depth_variant_filtration.sh
+
+#!/bin/bash
+
+REFERENCE="/data2/Training_set/HAV3.1_renamed.fa"
+GATK_JAR="/usr/local/src/GenomeAnalysisTK.jar"
+THRESHOLD_FILE="V_dp_thresholds.csv" #change as needed per sample
+
+# Directory where your sample-specific VCFs are stored
+VCF_DIR="."  # change this if they are in a subfolder
+
+# Skip header and loop through each row
+tail -n +2 "$THRESHOLD_FILE" | while IFS=',' read -r SAMPLE LOWER UPPER; do
+    SAMPLE=$(echo "$SAMPLE" | tr -d '\r\n')
+
+    echo "Looking for VCF for sample: $SAMPLE"
+
+    # Find the matching input VCF file
+    INPUT=$(find "$VCF_DIR" -maxdepth 1 -type f -name "${SAMPLE}_*genotype_noINDEL_noCNV.vcf" | head -n 1)
+    if [[ -z "$INPUT" ]]; then
+        echo "❌ No VCF file found for $SAMPLE. Skipping..."
+         continue
+     fi
+
+     BASENAME=$(basename "$INPUT" .vcf)
+     OUTPUT="${BASENAME/_genotype_noINDEL_noCNV/_genotype_depth}.vcf"
+
+    echo "✅ Filtering $INPUT with thresholds: DP < $LOWER and DP > $UPPER"
+     java -jar "$GATK_JAR" \
+         -T VariantFiltration \
+         -R "$REFERENCE" \
+         -V "$INPUT" \
+         --filterExpression "DP < $LOWER" \
+         --filterName "LowDPDrone" \
+         --filterExpression "DP > $UPPER" \
+         --filterName "HighDPDrone" \
+         -o "$OUTPUT"
+done
+
+############### VZM_filter_end_names.txt
+
+V-01_V_raw_genotype_depth
+V-03_V_raw_genotype_depth
+V-04_V_raw_genotype_depth
+V-05_V_raw_genotype_depth
+Z-01_Z_raw_genotype_depth
+Z-03_Z_raw_genotype_depth
+Z-04_Z_raw_genotype_depth
+Z-05_Z_raw_genotype_depth
+M-01_M_raw_genotype_depth
+M-02_M_raw_genotype_depth
+M-04_M_raw_genotype_depth 
+M-05_M_raw_genotype_depth
+
+################## VZM_end_filter.sh
+
+#!/bin/bash
+cd /data3/dova_nanuq_raw_data/Chapter_3/
+filename="VZM_filter_end_names.txt"
+
+while read -r sample; do
+  echo "📂 Processing sample: $sample"
+
+  input_vcf="${sample}.vcf"
+  output_vcf2="${sample}_filter2.vcf"
+  output_vcf3="${sample}_filter3.vcf"
+
+  # Check if input file exists
+  if [[ ! -f "$input_vcf" ]]; then
+    echo "❌ File not found: $input_vcf"
+      continue
+    fi
+
+    # Convert VCF format
+   cat "$input_vcf" |  vcf-convert -v 4.1 > "$output_vcf2"  
+
+  # Filter out Indel and CNV
+  grep -v -E "Indel|CNV" "$output_vcf2" > "$output_vcf3"
+
+  echo "✅ Finished processing $sample"
+done < "$filename"
+
+
+############ combine 
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T CombineVariants -R /data2/Training_set/HAV3.1_renamed.fa -V V-01_V_raw_genotype_depth_filter3.vcf -V V-03_V_raw_genotype_depth_filter3.vcf -V V-04_V_raw_genotype_depth_filter3.vcf -V V-05_V_raw_genotype_depth_filter3.vcf -o V_combined_filter_3_apr29.vcf --genotypemergeoption UNSORTED
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T CombineVariants -R /data2/Training_set/HAV3.1_renamed.fa -V Z-01_Z_raw_genotype_depth_filter3.vcf -V Z-03_Z_raw_genotype_depth_filter3.vcf -V Z-04_Z_raw_genotype_depth_filter3.vcf -V Z-05_Z_raw_genotype_depth_filter3.vcf -o Z_combined_filter_3_apr29.vcf --genotypemergeoption UNSORTED
+
+java -jar /usr/local/src/GenomeAnalysisTK.jar -T CombineVariants -R /data2/Training_set/HAV3.1_renamed.fa -V M-01_M_raw_genotype_depth_filter3.vcf -V M-02_M_raw_genotype_depth_filter3.vcf -V M-04_M_raw_genotype_depth_filter3.vcf -V M-05_M_raw_genotype_depth_filter3.vcf -o M_combined_filter_3_apr29.vcf --genotypemergeoption UNSORTED
+
+
